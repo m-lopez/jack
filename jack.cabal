@@ -2,13 +2,13 @@ name:                jack
 version:             0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/githubuser/jack#readme
-license:             BSD3
+homepage:            https://github.com/m-lopez/jack
+license:             MIT
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
-category:            Web
+author:              Michael Lopez
+maintainer:          michael.lopez.332@gmail.com
+copyright:           2017 Michael Lopez
+category:            Language
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -38,4 +38,4 @@ test-suite jack-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/jack
+  location: https://github.com/m-lopez/jack
