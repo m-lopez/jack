@@ -1,10 +1,6 @@
-module Typing ( Expr(..)
-              , synth_expr
+module Typing ( synth_expr
               , check_expr
-              , check_type
-              , CType(..)
-              , QType(..)
-              , Expr_name(..)) where
+              , check_type) where
 
 --  TODOS
 --    Add better debug support. Need locus information from the parser.

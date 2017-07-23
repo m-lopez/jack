@@ -6,8 +6,8 @@ import Expressions (
   Expr(..),
   Expr_name,
   subst_expr,
-  subst_exprs )
-import Typing ( CType(..), QType(..))
+  subst_exprs,
+  CType(..), QType(..) )
 import Util.DebugOr ( DebugOr, require_or_else )
 import BuiltIns ( lookup_unary_builtin, lookup_binary_builtin )
 
