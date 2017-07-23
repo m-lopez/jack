@@ -17,13 +17,13 @@ import Data.List ( dropWhile, dropWhileEnd, stripPrefix )
 import System.IO ( putStr, putStrLn, hFlush, stdout )
 
 -- | The welcome text for the repl.
-welcome_text :: String
-welcome_text =
+welcomeText :: String
+welcomeText =
   "Welcome to the BT language. For a list of commands, type `:help`."
 
 -- | The help text.
-help_text :: String
-help_text =
+helpText :: String
+helpText =
   "\nHere is a list of commands.\n\
     \ \n\
     \  :ast e    Prints the parse tree of an expression `e`.\n\
@@ -33,16 +33,16 @@ help_text =
     \  :quit     Exit the terminal.\n"
 
 -- | Unrecognized command message.
-unrecognized_command :: String -> String
-unrecognized_command cmd = "unrecognized command `" ++ cmd ++ "`; try `:help`"
+unrecognizedCommand :: String -> String
+unrecognizedCommand cmd = "unrecognized command `" ++ cmd ++ "`; try `:help`"
 
 -- | Immediately flushes the standard output buffer.
-flush_str :: String -> IO ()
-flush_str s = putStr s >> hFlush stdout
+flushStr :: String -> IO ()
+flushStr s = putStr s >> hFlush stdout
 
 -- | Print a prompt and read the input.
 prompt :: String -> IO String
-prompt s = flush_str s >> getLine
+prompt s = flushStr s >> getLine
 
 -- | Code that parses, elaborates, and evaluates the code.
 eval :: String -> String
@@ -63,31 +63,31 @@ strip_prefix cmd s = case stripPrefix cmd s of
   _                           -> Nothing
 
 -- | Prints a parse tree.
-parse_tree :: String -> String
-parse_tree s = show_underlying $ simple_parse s
+parseTree :: String -> String
+parseTree s = show_underlying $ simple_parse s
 
 -- | Prints the type of an expression.
 -- FIXME: We have demonstrated the need to print expressions in a debug and
 --        source code mode.
-type_synth :: String -> DebugOr (Expr, QType)
-type_synth s = do
+typeSynth :: String -> DebugOr (Expr, QType)
+typeSynth s = do
   ast <- simple_parse s
   (e, t) <- synth_expr builtins_ctx ast
   return (e, t)
 
 -- | Execution of a REPL command.
-execute_command :: String -> IO ()
-execute_command (strip_prefix "help" -> Just _) = putStrLn help_text
-execute_command (strip_prefix "ast"  -> Just x) = putStrLn $ parse_tree x
-execute_command (strip_prefix "t"    -> Just x) = putStrLn $ show_underlying $ fmap snd $ type_synth x
-execute_command (strip_prefix "elab" -> Just x) = putStrLn $ show_underlying $ fmap fst $ type_synth x
-execute_command cmd = putStrLn $ unrecognized_command cmd
+executeCommand :: String -> IO ()
+executeCommand (strip_prefix "help" -> Just _) = putStrLn helpText
+executeCommand (strip_prefix "ast"  -> Just x) = putStrLn $ parseTree x
+executeCommand (strip_prefix "t"    -> Just x) = putStrLn $ show_underlying $ snd <$> typeSynth x
+executeCommand (strip_prefix "elab" -> Just x) = putStrLn $ show_underlying $ fst <$> typeSynth x
+executeCommand cmd = putStrLn $ unrecognizedCommand cmd
 
 -- | Code to evaluate an expression and print it.
-eval_and_print :: String -> IO ()
-eval_and_print line = case line of
+evalThenPrint :: String -> IO ()
+evalThenPrint line = case line of
   []        -> putStrLn ""
-  ':' : cmd -> execute_command cmd
+  ':' : cmd -> executeCommand cmd
   _         -> putStrLn $ eval line
 
 -- | Removes preceding and trailing whitespace.
@@ -95,11 +95,11 @@ dropWhiteSpace :: String -> String
 dropWhiteSpace s = dropWhileEnd isSpace $ dropWhile isSpace s
 
 -- | Runs the prompt and returns the result unless it is the quit command.
-prompt_quit_check :: IO (Maybe String)
-prompt_quit_check = do
+promptQuitCheck :: IO (Maybe String)
+promptQuitCheck = do
   res <- dropWhiteSpace <$> prompt "> "
   return $ if res == ":quit" then Nothing else Just res
 
 -- | The REPL.
 repl :: IO ()
-repl = putStrLn welcome_text >> whileJust_ prompt_quit_check eval_and_print
+repl = putStrLn welcomeText >> whileJust_ promptQuitCheck evalThenPrint
