@@ -99,7 +99,7 @@ appTests = [
     (A_app (sym "f") [ sym "x" ]),
   SyntaxTest
     "f -x" -- If we want to treat `-` as unary, then we would get `n-m` -> `n(-m)`.
-    (A_app (sym "f") [ A_app (sym "-") [ sym "x" ] ]),
+    (A_app (sym "-") [ sym "f", sym "x" ]),
   SyntaxTest
     "f (-x)"
     (A_app (sym "f") [ A_app (sym "-") [ sym "x" ] ]),

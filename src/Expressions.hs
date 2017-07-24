@@ -110,6 +110,7 @@ are_structurally_equal_ctype t1 t2 = case (t1,t2) of
       targets_eq   = are_structurally_equal_ctype tgt_t1 tgt_t2
     in same_lengths && sources_eq && targets_eq
   (CT_var (Type_name x1), CT_var (Type_name x2)) -> x1 == x2
+  _ -> False
 
 -- Structural equality on expressions.
 -- Note: This does not compute alpha equivalence.
