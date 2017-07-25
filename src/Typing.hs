@@ -46,14 +46,14 @@ newtype OverloadSet = OverloadSet { interps :: [(Expr, QType)] }
 -- Print just the immediate node.
 summerizeForm :: Ast -> String
 summerizeForm ast = case ast of
-  A_lit_bool b -> show b
-  A_lit_int n  -> show n
-  A_arrow _ _  -> "_ -> _"
-  A_name _     -> "x"
-  A_abs _ _    -> "\\(x:t,...) -> e"
-  A_app _ _    -> "e e"
-  A_if _ _ _   -> "if b then e else e"
-  A_def _ _    -> "def x:t := e"
+  ALitBool b -> show b
+  ALitInt n  -> show n
+  AArrow _ _  -> "_ -> _"
+  AName _     -> "x"
+  AAbs _ _    -> "\\(x:t,...) -> e"
+  AApp _ _    -> "e e"
+  AIf _ _ _   -> "if b then e else e"
+  ADef _ _    -> "def x:t := e"
 
 
 
@@ -108,7 +108,7 @@ viable ctx f t ps = do
 -- Perform C++-style overload resolution for the call `p ps`.
 resolve :: Ctx -> Ast -> [Ast] -> DebugOr OverloadSet
 resolve ctx p ps = case p of
-  A_name n -> do
+  AName n -> do
     cands   <- lookupVar n ctx                          -- Computes a candidate set
     viables <- onlySuccessful $ map (\(f, t) -> viable ctx f t ps) $ interps cands  -- Computes viable functions
     _       <- requireOrElse (not $ null viables) "no valid interpretations for application"
@@ -156,24 +156,24 @@ checkType ctx p = let DebugOr k = checkUnquantType ctx p in case k of
 
 checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
-  A_lit_bool _  ->
+  ALitBool _  ->
     fail $ "expected type; got " ++ summerizeForm p
-  A_lit_int _   ->
+  ALitInt _   ->
     fail $ "expected type; got " ++ summerizeForm p
-  A_arrow ps p -> do
+  AArrow ps p -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p
     return $ CTArrow src_ts tgt_t
-  A_name xt ->
+  AName xt ->
     let (AstName n) = xt in
       return $ CTVar $ TypeName n
-  A_abs _ _ ->
+  AAbs _ _ ->
     fail $ "expected type; got " ++ summerizeForm p
-  A_app _ _ ->
+  AApp _ _ ->
     fail $ "expected type; got " ++ summerizeForm p
-  A_if _ _ _ ->
+  AIf _ _ _ ->
     fail $ "expected type; got " ++ summerizeForm p
-  A_def _ _ ->
+  ADef _ _ ->
     fail $ "expected type; got " ++ summerizeForm p
 
 checkUnquantTypes :: Ctx -> [Ast] -> DebugOr [CType]
@@ -193,14 +193,14 @@ checkUnquantTypes ctx = traverse (checkUnquantType ctx)
 -- Synthesize a typed expression from an AST.
 synthExpr :: Ctx -> Ast -> DebugOr (Expr, QType)
 synthExpr ctx p = case p of
-  A_lit_bool b  ->
+  ALitBool b  ->
     return (ELitBool b, Unquantified CTBool)
-  A_lit_int i   ->
+  ALitInt i   ->
     return (ELitInt i, Unquantified CTInt)
-  A_name px -> do
+  AName px -> do
     viable <- lookupVar px ctx
     requireSingleton viable p
-  A_abs bindings p ->
+  AAbs bindings p ->
     let
       (ps, pts) = unzip bindings
       vars      = map toExprName ps
@@ -209,10 +209,10 @@ synthExpr ctx p = case p of
       (e, t2) <- synthExpr (extendVars (zip vars $ map Unquantified ts) ctx) p
       t2'     <- requireUnquantifiedType t2
       return (EAbs (zip vars ts) e, Unquantified $ CTArrow ts t2')
-  A_app p1 p2 -> do
+  AApp p1 p2 -> do
     viable <- resolve ctx p1 p2
     requireSingleton viable p
-  A_if p1 p2 p3 -> do
+  AIf p1 p2 p3 -> do
     (e1, _)  <- checkExpr ctx p1 (Unquantified CTBool)
     (e2, t2) <- synthExpr ctx p2
     (e3, t3) <- synthExpr ctx p3
@@ -226,16 +226,16 @@ synthExprs ctx = traverse (synthExpr ctx)
 -- Derive a type checking judgment.
 checkExpr :: Ctx -> Ast -> QType -> DebugOr (Expr, QType)
 checkExpr ctx p ret_t = case p of
-  A_lit_bool b  -> do
+  ALitBool b  -> do
     requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTBool)) "need better err msg"
     return (ELitBool b, Unquantified CTBool)
-  A_lit_int i   -> do
+  ALitInt i   -> do
     requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTInt)) "need better err msg"
     return (ELitInt i, Unquantified CTInt)
-  A_name px -> do
+  AName px -> do
     viable <- lookupVar px ctx
     selectByType ret_t viable
-  A_abs bindings p ->
+  AAbs bindings p ->
     let
       (ns, nts) = unzip bindings
       vars      = map toExprName ns
@@ -246,10 +246,10 @@ checkExpr ctx p ret_t = case p of
       (e, tgt_t')     <- checkExpr (extendVars (zip vars $ map Unquantified src_ts') ctx) p (Unquantified tgt_t)
       requireOrElse (areStructurallyEqualQType tgt_t' (Unquantified tgt_t)) "type mismatch: unimplemented"
       return (EAbs (zip vars src_ts) e, ret_t)
-  A_app p1 p2 -> do
+  AApp p1 p2 -> do
     viable <- resolve ctx p1 p2
     selectByType ret_t viable
-  A_if p1 p2 p3 -> do
+  AIf p1 p2 p3 -> do
     (e1, _)  <- checkExpr ctx p1 (Unquantified CTBool)
     (e2, _) <- checkExpr ctx p2 ret_t
     (e3, _) <- checkExpr ctx p3 ret_t

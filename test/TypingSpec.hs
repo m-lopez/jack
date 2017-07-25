@@ -27,7 +27,7 @@ emptyCtx = Ctx [ ]
 -- Creates an AST name.
 -- FIXME: Put into common test utils module.
 sym :: String -> Ast
-sym = A_name . AstName
+sym = AName . AstName
 
 var :: String -> QType -> Expr
 var = EVar . ExprName
@@ -68,17 +68,17 @@ simpleTests :: [CheckTest]
 simpleTests = [
   CheckTest
     emptyCtx
-    (A_lit_bool True)
+    (ALitBool True)
     (Unquantified CTBool)
     (ELitBool True),
   CheckTest
     emptyCtx
-    (A_lit_int 23)
+    (ALitInt 23)
     (Unquantified CTInt)
     (ELitInt 23),
   CheckTest
     emptyCtx
-    (A_if (A_lit_bool True) (A_lit_int 1) (A_lit_int 2))
+    (AIf (ALitBool True) (ALitInt 1) (ALitInt 2))
     (Unquantified CTInt)
     (EIf (ELitBool True) (ELitInt 1) (ELitInt 2)) ]
 
@@ -88,12 +88,12 @@ closedTests :: [CheckTest]
 closedTests = [ ]
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (AstName "n", A_type_int) ] (A_lit_int 2)) [ A_lit_int 3 ])
+  --   (AApp (AAbs [ (AstName "n", ATypeInt) ] (ALitInt 2)) [ ALitInt 3 ])
   --   (Unquantified CTInt)
   --   (EApp (EAbs [ (ExprName "n", CTInt) ] (ELitInt 2)) [ ELitInt 3 ]),
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (AstName "n", A_type_int) ] (sym "n")) [ A_lit_int 3 ])
+  --   (AApp (AAbs [ (AstName "n", ATypeInt) ] (sym "n")) [ ALitInt 3 ])
   --   (Unquantified CTInt)
   --   (EApp (EAbs [ (ExprName "n", CTInt) ] (var "n" $ Unquantified CTInt)) [ ELitInt 3 ]) ]
 
@@ -121,12 +121,12 @@ overloadTests :: [CheckTest]
 overloadTests = [
   CheckTest
     (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
-    (A_app (sym "f") [ A_lit_int 2 ])
+    (AApp (sym "f") [ ALitInt 2 ])
     (Unquantified CTInt)
     (EApp (var "f" $ Unquantified $ CTArrow [CTInt] CTInt) [ ELitInt 2 ]),
   CheckTest
     (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
-    (A_app (sym "f") [ A_lit_bool True ])
+    (AApp (sym "f") [ ALitBool True ])
     (Unquantified CTBool)
     (EApp (var "f" $ Unquantified $ CTArrow [CTBool] CTBool) [ ELitBool True ]) ]
 
@@ -134,17 +134,17 @@ builtinCtxTests :: [CheckTest]
 builtinCtxTests = [
   CheckTest
     builtinsCtx
-    (A_app (A_name (AstName "+")) [A_lit_int 2,A_lit_int 2])
+    (AApp (AName (AstName "+")) [ALitInt 2,ALitInt 2])
     (Unquantified CTInt)
     (EApp (var "+" $ Unquantified $ CTArrow [CTInt, CTInt] CTInt) [ ELitInt 2, ELitInt 2 ]),
   CheckTest
     builtinsCtx
-    (A_app (A_name (AstName "rem")) [A_lit_int 2,A_lit_int 2])
+    (AApp (AName (AstName "rem")) [ALitInt 2,ALitInt 2])
     (Unquantified CTInt)
     (EApp (var "rem" $ Unquantified $ CTArrow [CTInt, CTInt] CTInt) [ ELitInt 2, ELitInt 2 ]),
   CheckTest
     builtinsCtx
-    (A_app (A_name (AstName "=")) [A_lit_int 2,A_lit_int 2])
+    (AApp (AName (AstName "=")) [ALitInt 2,ALitInt 2])
     (Unquantified CTBool)
     (EApp (var "=" $ Unquantified $ CTArrow [CTInt, CTInt] CTBool) [ ELitInt 2, ELitInt 2 ]) ]
 
