@@ -1,9 +1,9 @@
 module ParserSpec ( parserSpec ) where
 
 import Test.HUnit ( assertEqual, Test(TestCase, TestList, TestLabel) )
-import Parser ( simple_parse, Ast(..), Ast_name (..) )
+import Parser ( simpleParse, Ast(..), AstName (..) )
 import Text.Parsec ( parse )
-import Util.DebugOr ( debug_rep )
+import Util.DebugOr ( debugRep )
 
 
 
@@ -11,11 +11,11 @@ import Util.DebugOr ( debug_rep )
 
 -- Creates an AST name.
 sym :: String -> Ast
-sym s = A_name $ Ast_name s
+sym = A_name . AstName
 
 -- Run the parser
 tryParse :: String -> Either String Ast
-tryParse s = case debug_rep $ simple_parse s of
+tryParse s = case debugRep $ simpleParse s of
   Left x  -> Left $ show x
   Right x -> Right x
 
@@ -71,13 +71,13 @@ lambdaTests :: [SyntaxTest]
 lambdaTests = [
   SyntaxTest
     "\\(n: Int) n"
-    (A_abs [(Ast_name "n", A_type_int)] $ sym "n"),
+    (A_abs [(AstName "n", A_type_int)] $ sym "n"),
   SyntaxTest
     "\\(n: Int, m: Int) n + m"
-    (A_abs [(Ast_name "n", A_type_int), (Ast_name "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ]),
+    (A_abs [(AstName "n", A_type_int), (AstName "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ]),
   SyntaxTest
     "\\(n:Int)\\(m:Int) n + m"
-    (A_abs [(Ast_name "n", A_type_int)] $ A_abs [(Ast_name "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ])
+    (A_abs [(AstName "n", A_type_int)] $ A_abs [(AstName "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ])
   ]
 
 -- Conditional tests.
@@ -88,7 +88,7 @@ conditionalTests = [
     (A_if (A_lit_bool False) (A_lit_int 1) (A_lit_int 2)),
   SyntaxTest
     "if b then \\(n:Int) n - 1 else \\(m:Int) m + 1"
-    (A_if (sym "b") (A_abs [(Ast_name "n", A_type_int)] (A_app (sym "-") [ sym "n", A_lit_int 1 ])) (A_abs [(Ast_name "m", A_type_int)] (A_app (sym "+") [ (sym "m"), (A_lit_int 1) ])))
+    (A_if (sym "b") (A_abs [(AstName "n", A_type_int)] (A_app (sym "-") [ sym "n", A_lit_int 1 ])) (A_abs [(AstName "m", A_type_int)] (A_app (sym "+") [ (sym "m"), (A_lit_int 1) ])))
   ]
 
 -- Application tests.

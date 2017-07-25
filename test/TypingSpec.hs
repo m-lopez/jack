@@ -2,14 +2,14 @@ module TypingSpec ( typingSpec ) where
 
 import Test.HUnit ( assertBool, Test(TestCase, TestList, TestLabel) )
 
-import Parser ( Ast(..), Ast_name (..) )
+import Parser ( Ast(..), AstName (..) )
 import Expressions (
   Expr(..),
   QType(..),
   CType(..),
-  Expr_name(..),
-  are_structurally_equal_expr )
-import Typing ( check_expr )
+  ExprName(..),
+  areStructurallyEqualExpr )
+import Typing ( checkExpr )
 import BuiltIns ( builtinsCtx )
 import Contexts ( Ctx(..), Binding(..) )
 import Util.DebugOr ( DebugOr(..) )
@@ -27,14 +27,14 @@ emptyCtx = Ctx [ ]
 -- Creates an AST name.
 -- FIXME: Put into common test utils module.
 sym :: String -> Ast
-sym s = A_name $ Ast_name s
+sym = A_name . AstName
 
 var :: String -> QType -> Expr
-var x = E_var $ Expr_name x
+var = E_var . ExprName
 
 -- Applies a binary relation under a `DebugOr`.
 applyRelation :: (a -> b -> Bool) -> DebugOr a -> DebugOr b -> Bool
-applyRelation r a b = case (debug_rep a, debug_rep b) of
+applyRelation r a b = case (debugRep a, debugRep b) of
   (Right a', Right b') -> r a' b'
   _                    -> False
 
@@ -48,9 +48,9 @@ mkPassingTypeCheckTest :: CheckTest -> Test
 mkPassingTypeCheckTest x = TestCase (assertBool name cond)
   where
     name = show ctx ++ " |- " ++ show p ++ ": " ++ show t ++ " => " ++ show e
-    cond = applyRelation are_structurally_equal_expr res exp
+    cond = applyRelation areStructurallyEqualExpr res exp
     res  = DebugOr $ Right e
-    exp  = fst <$> check_expr ctx p t
+    exp  = fst <$> checkExpr ctx p t
     ctx  = ctGetCtx x
     p    = ctGetCode x
     t    = ctGetType x
@@ -88,30 +88,30 @@ closedTests :: [CheckTest]
 closedTests = [ ]
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (Ast_name "n", A_type_int) ] (A_lit_int 2)) [ A_lit_int 3 ])
+  --   (A_app (A_abs [ (AstName "n", A_type_int) ] (A_lit_int 2)) [ A_lit_int 3 ])
   --   (Unquantified CT_int)
-  --   (E_app (E_abs [ (Expr_name "n", CT_int) ] (E_lit_int 2)) [ E_lit_int 3 ]),
+  --   (E_app (E_abs [ (ExprName "n", CT_int) ] (E_lit_int 2)) [ E_lit_int 3 ]),
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (Ast_name "n", A_type_int) ] (sym "n")) [ A_lit_int 3 ])
+  --   (A_app (A_abs [ (AstName "n", A_type_int) ] (sym "n")) [ A_lit_int 3 ])
   --   (Unquantified CT_int)
-  --   (E_app (E_abs [ (Expr_name "n", CT_int) ] (var "n" $ Unquantified CT_int)) [ E_lit_int 3 ]) ]
+  --   (E_app (E_abs [ (ExprName "n", CT_int) ] (var "n" $ Unquantified CT_int)) [ E_lit_int 3 ]) ]
 
 -- Tests on expressions with free variables.
 simpleContextTests :: [CheckTest]
 simpleContextTests = [
   CheckTest
-    (Ctx [ B_var (Expr_name "n") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CT_int) ])
     (sym "n")
     (Unquantified CT_int)
     (var "n" $ Unquantified CT_int),
   CheckTest
-    (Ctx [ B_var (Expr_name "n") (Unquantified CT_int), B_var (Expr_name "m") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CT_int), BVar (ExprName "m") (Unquantified CT_int) ])
     (sym "n")
     (Unquantified CT_int)
     (var "n" $ Unquantified CT_int),
   CheckTest
-    (Ctx [ B_var (Expr_name "m") (Unquantified CT_int), B_var (Expr_name "n") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "m") (Unquantified CT_int), BVar (ExprName "n") (Unquantified CT_int) ])
     (sym "n")
     (Unquantified CT_int)
     (var "n" $ Unquantified CT_int) ]
@@ -120,12 +120,12 @@ simpleContextTests = [
 overloadTests :: [CheckTest]
 overloadTests = [
   CheckTest
-    (Ctx [ B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_int] CT_int), B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CT_arrow [CT_int] CT_int), BVar (ExprName "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
     (A_app (sym "f") [ A_lit_int 2 ])
     (Unquantified CT_int)
     (E_app (var "f" $ Unquantified $ CT_arrow [CT_int] CT_int) [ E_lit_int 2 ]),
   CheckTest
-    (Ctx [ B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_int] CT_int), B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CT_arrow [CT_int] CT_int), BVar (ExprName "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
     (A_app (sym "f") [ A_lit_bool True ])
     (Unquantified CT_bool)
     (E_app (var "f" $ Unquantified $ CT_arrow [CT_bool] CT_bool) [ E_lit_bool True ]) ]
@@ -134,17 +134,17 @@ builtinCtxTests :: [CheckTest]
 builtinCtxTests = [
   CheckTest
     builtinsCtx
-    (A_app (A_name (Ast_name "+")) [A_lit_int 2,A_lit_int 2])
+    (A_app (A_name (AstName "+")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_int)
     (E_app (var "+" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
   CheckTest
     builtinsCtx
-    (A_app (A_name (Ast_name "rem")) [A_lit_int 2,A_lit_int 2])
+    (A_app (A_name (AstName "rem")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_int)
     (E_app (var "rem" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
   CheckTest
     builtinsCtx
-    (A_app (A_name (Ast_name "=")) [A_lit_int 2,A_lit_int 2])
+    (A_app (A_name (AstName "=")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_bool)
     (E_app (var "=" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_bool) [ E_lit_int 2, E_lit_int 2 ]) ]
 

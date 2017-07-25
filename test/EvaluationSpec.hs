@@ -5,10 +5,10 @@ import Expressions (
   Expr(..),
   CType(..),
   QType(..),
-  Expr_name(..),
-  are_structurally_equal_expr )
-import Evaluator ( eval_expr )
-import Util.DebugOr ( DebugOr(debug_rep), mk_success )
+  ExprName(..),
+  areStructurallyEqualExpr )
+import Evaluator ( evalExpr )
+import Util.DebugOr ( DebugOr(debugRep), mkSuccess )
 
 
 
@@ -16,12 +16,12 @@ import Util.DebugOr ( DebugOr(debug_rep), mk_success )
 
 -- FIXME: Move this shorthand into a test utils.
 var :: String -> QType -> Expr
-var x = E_var (Expr_name x)
+var x = E_var (ExprName x)
 
 -- Applies a binary relation under a `DebugOr`.
 -- FIXME: Add this to a common collection of test utilities.
 applyRelation :: (a -> b -> Bool) -> DebugOr a -> DebugOr b -> Bool
-applyRelation r a b = case (debug_rep a, debug_rep b) of
+applyRelation r a b = case (debugRep a, debugRep b) of
   (Right a', Right b') -> r a' b'
   _                    -> False
 
@@ -31,10 +31,10 @@ mkPassingEvalTest :: EvalEqTest -> Test
 mkPassingEvalTest x = TestCase $ assertBool name cond
   where
     e    = getUneval x
-    v    = eval_expr e
+    v    = evalExpr e
     expe = getExpectedValue x
     name = show e ++ " --> " ++ show expe
-    cond = applyRelation are_structurally_equal_expr (mk_success expe) v
+    cond = applyRelation areStructurallyEqualExpr (mkSuccess expe) v
 
 mkPassingEvalTests :: [ EvalEqTest ] -> Test
 mkPassingEvalTests = TestList . map mkPassingEvalTest

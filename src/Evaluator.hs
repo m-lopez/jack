@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module Evaluator ( eval_expr ) where
+module Evaluator ( evalExpr ) where
 
 import Expressions (
   Expr(..),
-  Expr_name,
-  subst_expr,
-  subst_exprs,
+  ExprName,
+  substExpr,
+  substExprs,
   CType(..), QType(..) )
-import Util.DebugOr ( DebugOr, require_or_else )
+import Util.DebugOr ( DebugOr, requireOrElse )
 import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
 
 
@@ -25,8 +25,8 @@ import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
 --  if false then e1 else e2 ~> e2
 
 -- We allow Maybe to catch compiler errors that lead to an unsound type system.
-eval_expr :: Expr -> DebugOr Expr
-eval_expr e = case e of
+evalExpr :: Expr -> DebugOr Expr
+evalExpr e = case e of
   E_lit_bool _ ->
     return e
   E_lit_int _ ->
@@ -35,53 +35,53 @@ eval_expr e = case e of
     return e
   E_abs _ _ ->
     return e
-  E_app e es -> eval_app e es
+  E_app e es -> evalApp e es
   E_if c e1 e2 -> do
-    res <- eval_expr c
-    b   <- as_bool res
-    if b then eval_expr e1 else eval_expr e2
+    res <- evalExpr c
+    b   <- asBool res
+    if b then evalExpr e1 else evalExpr e2
 
-eval_app :: Expr -> [Expr] -> DebugOr Expr
-eval_app e es = do
-    vs <- eval_exprs es
-    f  <- eval_expr e
+evalApp :: Expr -> [Expr] -> DebugOr Expr
+evalApp e es = do
+    vs <- evalExprs es
+    f  <- evalExpr e
     case f of
-      E_abs xs e' -> eval_lambda_app e' xs vs
-      E_var x t   -> eval_builtin x t vs
+      E_abs xs e' -> evalLambdaApp e' xs vs
+      E_var x t   -> evalBuiltin x t vs
       _           -> fail "callee is not callable"
 
-eval_lambda_app :: Expr -> [(Expr_name, CType)] -> [Expr] -> DebugOr Expr
-eval_lambda_app e xs vs = do
-  require_or_else (length vs == length xs) "arity doesn't match number of arguments"
+evalLambdaApp :: Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
+evalLambdaApp e xs vs = do
+  requireOrElse (length vs == length xs) "arity doesn't match number of arguments"
   let xts = map (\(x,t) -> (x, Unquantified t)) xs
   let subst = zip xts vs
-  eval_expr $ subst_exprs subst e
+  evalExpr $ substExprs subst e
 
-eval_builtin :: Expr_name -> QType -> [Expr] -> DebugOr Expr
-eval_builtin x t vs = case vs of
-  v : []       -> eval_unary_builtin x t v
-  v1 : v2 : [] -> eval_binary_builtin x t (v1, v2)
-  _            -> fail ("no built-ins with arity " ++ (show $ length vs))
+evalBuiltin :: ExprName -> QType -> [Expr] -> DebugOr Expr
+evalBuiltin x t vs = case vs of
+  [v]     -> evalUnaryBuiltin x t v
+  [v1,v2] -> evalBinaryBuiltin x t (v1, v2)
+  _       -> fail ("no built-ins with arity " ++ (show $ length vs))
 
-eval_unary_builtin :: Expr_name -> QType -> Expr -> DebugOr Expr
-eval_unary_builtin x t v = do
+evalUnaryBuiltin :: ExprName -> QType -> Expr -> DebugOr Expr
+evalUnaryBuiltin x t v = do
     op <- lookupUnaryBuiltin x t
     op v
 
-eval_binary_builtin :: Expr_name -> QType -> (Expr, Expr) -> DebugOr Expr
-eval_binary_builtin x t vs = do
+evalBinaryBuiltin :: ExprName -> QType -> (Expr, Expr) -> DebugOr Expr
+evalBinaryBuiltin x t vs = do
     op <- lookupBinaryBuiltin x t
     op vs
 
-eval_exprs :: [Expr] -> DebugOr [Expr]
-eval_exprs es = traverse eval_expr es
+evalExprs :: [Expr] -> DebugOr [Expr]
+evalExprs = traverse evalExpr
 
-as_lambda :: Expr -> DebugOr ([(Expr_name, CType)], Expr)
-as_lambda e = case e of
+asLambda :: Expr -> DebugOr ([(ExprName, CType)], Expr)
+asLambda e = case e of
   E_abs params e' -> return (params, e')
   _               -> fail "callee is not callable"
 
-as_bool :: Expr -> DebugOr Bool
-as_bool e = case e of
+asBool :: Expr -> DebugOr Bool
+asBool e = case e of
   E_lit_bool b -> return b
   _            -> fail "value is not a Boolean"

@@ -1,9 +1,9 @@
 module Parser ( Ast (..)
-              , Ast_name (..)
-              , repl_parse
-              , simple_parse) where
+              , AstName (..)
+              , replParse
+              , simpleParse) where
 
-import Util.DebugOr( DebugOr(..), fail, mk_success )
+import Util.DebugOr( DebugOr(..), fail, mkSuccess )
 
 import Control.Applicative ((<*), (*>), (<|>), (<$>))
 import Control.Monad (void)
@@ -25,22 +25,22 @@ import Text.Parsec.Expr ( buildExpressionParser
 --
 --  A type representing untyped, abstract syntax tree.
 
-newtype Ast_name  = Ast_name String  deriving (Show, Eq)
+newtype AstName  = AstName String  deriving (Show, Eq)
 
 data Ast =
     A_type_bool
   | A_type_int
   | A_arrow     [Ast] Ast
-  | A_rec_t     [(Ast_name, Ast)]
+  | A_rec_t     [(AstName, Ast)]
   | A_lit_bool  Bool
   | A_lit_int   Integer
-  | A_name      Ast_name
-  | A_abs       [(Ast_name, Ast)] Ast
+  | A_name      AstName
+  | A_abs       [(AstName, Ast)] Ast
   | A_app       Ast [Ast]
   | A_if        Ast Ast Ast
   | A_coerce    Ast Ast
   | A_init      [Ast]
-  | A_def       (Ast_name, Ast) Ast
+  | A_def       (AstName, Ast) Ast
   deriving (Show, Eq)
 
 
@@ -49,13 +49,13 @@ data Ast =
 --  Reserved tokens and string manipulation.
 
 -- Reserved keywords.
-reserved_keywords :: [String]
-reserved_keywords = [ "if", "then", "else", "true", "false", "Bool", "Int",
+reservedKeywords :: [String]
+reservedKeywords = [ "if", "then", "else", "true", "false", "Bool", "Int",
                       "def", "and", "or", "not", "rem" ]
 
 -- Reserved symbols.
-reserved_symbols :: [String]
-reserved_symbols = [ "->", "\\(", "(", ")", ",", ":=", ":", "=", "<>", "<", ">",
+reservedSymbols :: [String]
+reservedSymbols = [ "->", "\\(", "(", ")", ",", ":=", ":", "=", "<>", "<", ">",
                      "<=", ">=" ]
 
 -- Quote a string.
@@ -71,27 +71,27 @@ whitespace :: Parser ()
 whitespace = void $ many $ oneOf " \n\t"
 
 -- Treat a parse rule as lexeme; eat trailing whitespace.
-as_lexeme :: Parser a -> Parser a
-as_lexeme p = p <* whitespace
+asLexeme :: Parser a -> Parser a
+asLexeme p = p <* whitespace
 
 -- Lex a string.
-require_keyword :: String -> Parser ()
-require_keyword s = case s `elem` reserved_keywords of
-  True  -> void $ as_lexeme $ string s
+requireKeyword :: String -> Parser ()
+requireKeyword s = case s `elem` reservedKeywords of
+  True  -> void $ asLexeme $ string s
   False -> fail $ "alien keyword: " ++ quote s
 
 -- Lex a symbol.
-require_symbol :: String -> Parser ()
-require_symbol s = case s `elem` reserved_symbols of
-  True  -> void $ as_lexeme $ string s
+requireSymbol :: String -> Parser ()
+requireSymbol s = case s `elem` reservedSymbols of
+  True  -> void $ asLexeme $ string s
   False -> fail $ "alien symbol: " ++ quote s
 
 -- Apply parse rule `p` between two symbols.
 enclosed :: String -> Parser a -> String -> Parser a
 enclosed open p close = do
-  _   <- as_lexeme $ string open
-  ast <- as_lexeme $ p
-  _   <- as_lexeme $ string close
+  _   <- asLexeme $ string open
+  ast <- asLexeme p
+  _   <- asLexeme $ string close
   return ast
 
 
@@ -99,13 +99,13 @@ enclosed open p close = do
 --------------------------------------------------------------------------------
 --  Parse rules for bindings.
 
--- binding ::= identifier ":" arrow_type
-binding :: Parser (Ast_name, Ast)
-binding = (\x y -> (x,y)) <$> identifier <* (require_symbol ":") <*> arrow_type
+-- binding ::= identifier ":" arrowType
+binding :: Parser (AstName, Ast)
+binding = (\x y -> (x,y)) <$> identifier <* requireSymbol ":" <*> arrowType
 
 -- bindings ::= [binding, ","]
-bindings :: Parser [(Ast_name, Ast)]
-bindings = sepBy binding (require_symbol ",")
+bindings :: Parser [(AstName, Ast)]
+bindings = sepBy binding (requireSymbol ",")
 
 
 
@@ -117,32 +117,32 @@ expr = lambda
 
 -- exprs ::= [expr; ","]
 exprs :: Parser [Ast]
-exprs = sepBy (as_lexeme expr) (require_symbol ",")
+exprs = sepBy (asLexeme expr) (requireSymbol ",")
 
 -- lambda ::= '\(' bindings ')' expr
 lambda :: Parser Ast
-lambda = (try abs_e) <|> conditional
+lambda = try abs_e <|> conditional
   where
-    abs_head = (require_symbol "\\(") *> bindings <* (require_symbol ")")
+    abs_head = requireSymbol "\\(" *> bindings <* requireSymbol ")"
     abs_e    = A_abs <$> abs_head <*> lambda
 
 -- conditional ::= 'if' expr 'then' expr 'else' expr
 --               | binary
 conditional :: Parser Ast
-conditional = try (if_then_else_expr) <|> binary
+conditional = try if_then_else_expr <|> binary
   where
     if_then_else_expr :: Parser Ast
     if_then_else_expr = do
-      _    <- require_keyword "if"
+      _    <- requireKeyword "if"
       ast1 <- expr
-      _    <- require_keyword "then"
+      _    <- requireKeyword "then"
       ast2 <- expr
-      _    <- require_keyword "else"
+      _    <- requireKeyword "else"
       ast3 <- expr
       return $ A_if ast1 ast2 ast3
 
-op_table :: [[Operator String () Identity Ast]]
-op_table = [
+opTable :: [[Operator String () Identity Ast]]
+opTable = [
   -- Unary additive operators.
   [ pre_op "-" ],
   -- Multiplicative operations.
@@ -165,17 +165,17 @@ op_table = [
   [ bin_opl "and",
     bin_opl "or"] ]
   where
-    as_app1 sym p = A_app (A_name $ Ast_name sym) [ p ]
-    pre_op sym = Prefix (as_app1 sym <$ (try (as_lexeme $ string sym)))
-    as_app2 sym p1 p2 = A_app (A_name $ Ast_name sym) [ p1, p2 ]
-    bin_opl sym = Infix (as_app2 sym <$ (try (as_lexeme $ string sym))) AssocLeft
+    as_app1 sym p = A_app (A_name $ AstName sym) [ p ]
+    pre_op sym = Prefix (as_app1 sym <$ try (asLexeme $ string sym))
+    as_app2 sym p1 p2 = A_app (A_name $ AstName sym) [ p1, p2 ]
+    bin_opl sym = Infix (as_app2 sym <$ try (asLexeme $ string sym)) AssocLeft
 
 binary :: Parser Ast
-binary = buildExpressionParser op_table application
+binary = buildExpressionParser opTable application
 
 -- arguments ::=  '(' [expr; ','] ')' | application
 arguments :: Parser [Ast]
-arguments = (enclosed "(" exprs ")") <|> call_expr_as_args
+arguments = enclosed "(" exprs ")" <|> call_expr_as_args
   where call_expr_as_args  = pure <$> application :: Parser [Ast]
 
 -- application ::= simple arguments | simple
@@ -184,72 +184,72 @@ application = try (A_app <$> simple <*> arguments) <|> simple
 
 -- simple ::= '(' expr ')' | variable | literal
 simple :: Parser Ast
-simple = (enclosed "(" expr ")") <|> variable <|> literal
+simple = enclosed "(" expr ")" <|> variable <|> literal
 
-identifier :: Parser Ast_name
+identifier :: Parser AstName
 identifier = do
-    n <- as_lexeme ((:) <$> letter <*> many varChar)
+    n <- asLexeme ((:) <$> letter <*> many varChar)
     _ <- require_not_reserved n
-    return $ Ast_name n
+    return $ AstName n
   where
     varChar = digit <|> letter <|> char '_'
-    require_not_reserved s = case s `elem` reserved_keywords || s `elem` reserved_symbols of
+    require_not_reserved s = case s `elem` reservedKeywords || s `elem` reservedSymbols of
       True  -> fail $ "expected identifier; got keyword " ++ quote s
       False -> return ()
 
 variable :: Parser Ast
 variable = try (A_name <$> identifier)
 
-bool_lit :: Parser Bool
-bool_lit = true <|> false
+boolLit :: Parser Bool
+boolLit = true <|> false
   where
-    true  = return True <* require_keyword "true"
-    false = return False <* require_keyword "false"
+    true  = return True <* requireKeyword "true"
+    false = return False <* requireKeyword "false"
 
-int_lit :: Parser Integer
-int_lit = read <$> many1 digit
+intLit :: Parser Integer
+intLit = read <$> many1 digit
 
 literal :: Parser Ast
-literal = as_lexeme $ (int <|> bool)
+literal = asLexeme $ int <|> bool
   where
-    int  = A_lit_int <$> read <$> many1 digit
-    bool = A_lit_bool <$> bool_lit
+    int  = A_lit_int . read <$> many1 digit
+    bool = A_lit_bool <$> boolLit
 
 
 
 --------------------------------------------------------------------------------
 --  Parse rules for types.
 
--- types ::= [arrow_type; ","]
+-- types ::= [arrowType; ","]
 types :: Parser [Ast]
-types = sepBy arrow_type (require_symbol ",")
+types = sepBy arrowType (requireSymbol ",")
 
--- literal_type ::= Bool | Integer
-literal_type :: Parser Ast
-literal_type = bool_type <|> int_type
+-- literalType ::= Bool | Integer
+literalType :: Parser Ast
+literalType = bool_type <|> int_type
   where
-    bool_type = return A_type_bool <* require_keyword "Bool"
-    int_type  = return A_type_int  <* require_keyword "Int"
+    bool_type = return A_type_bool <* requireKeyword "Bool"
+    int_type  = return A_type_int  <* requireKeyword "Int"
 
--- rec_type ::= "{" bindings "}"
-rec_type :: Parser Ast
-rec_type = A_rec_t <$> enclosed "{" bindings "}"
+-- recType ::= "{" bindings "}"
+recType :: Parser Ast
+recType = A_rec_t <$> enclosed "{" bindings "}"
 
--- base_type ::= (arrow_type) | var | literal_type
-base_type :: Parser Ast
-base_type =
-  (enclosed "(" arrow_type ")") <|> rec_type <|> literal_type <|> variable
+-- baseType ::= (arrowType) | var | literalType
+baseType :: Parser Ast
+baseType =
+  enclosed "(" arrowType ")" <|> recType <|> literalType <|> variable
 
--- arrow_type ::= "(" types ")" -> arrow_type
---              | base_type -> arrow_type
---              | base_type
-arrow_type :: Parser Ast
-arrow_type = try (A_arrow <$> arrow_head <*> arrow_type)
-         <|> try (A_arrow <$> simple_head <*> arrow_type)
-         <|> base_type
+-- arrowType ::= "(" types ")" -> arrowType
+--              | baseType -> arrowType
+--              | baseType
+arrowType :: Parser Ast
+arrowType = try (A_arrow <$> arrow_head <*> arrowType)
+         <|> try (A_arrow <$> simple_head <*> arrowType)
+         <|> baseType
   where
-    arrow_head  = (enclosed "(" types ")") <* (require_symbol "->")
-    simple_head = (pure <$> base_type) <* (require_symbol "->") :: Parser [Ast]
+    arrow_head  = enclosed "(" types ")" <* requireSymbol "->"
+    simple_head = pure <$> baseType <* requireSymbol "->" :: Parser [Ast]
 
 
 
@@ -259,18 +259,18 @@ arrow_type = try (A_arrow <$> arrow_head <*> arrow_type)
 def :: Parser Ast
 def = A_def <$> def_head <*> expr
   where
-    def_head = (require_keyword "def") *> binding <* (require_symbol ":=")
+    def_head = requireKeyword "def" *> binding <* requireSymbol ":="
 
 
 
 --------------------------------------------------------------------------------
 --  A REPL parser.
 --  FIXME: Guard against EOF.
-repl_parse :: Parser Ast
-repl_parse = def <|> arrow_type <|> expr
+replParse :: Parser Ast
+replParse = def <|> arrowType <|> expr
 
 -- FIXME: This is not thought out.
-simple_parse :: String -> DebugOr Ast
-simple_parse s = case parse expr "simple_expression_parser" s of
+simpleParse :: String -> DebugOr Ast
+simpleParse s = case parse expr "simple_expression_parser" s of
   Left x  -> fail $ show x
-  Right x -> mk_success x
+  Right x -> mkSuccess x
