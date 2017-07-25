@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
+
 module BuiltIns (
-  lookup_binary_builtin,
-  lookup_unary_builtin,
-  builtins_ctx ) where
+  lookupBinaryBuiltin,
+  lookupUnaryBuiltin,
+  builtinsCtx ) where
 
 import Expressions (
   Expr_name(..),
@@ -21,27 +22,27 @@ import Data.List ( find )
 data UnaryIntrinsicData = UnaryIntrinsicData Expr_name QType (Expr -> DebugOr Expr)
 
 -- | Retrieve the operation from the intrinsic.
-get_un_op_code :: UnaryIntrinsicData -> Expr -> DebugOr Expr
-get_un_op_code (UnaryIntrinsicData _ _ op) = op
+getUnOpCode :: UnaryIntrinsicData -> Expr -> DebugOr Expr
+getUnOpCode (UnaryIntrinsicData _ _ op) = op
 
 
 -- FIXME: Can add another parameter to make sure the output type is the expected
 --        type.
 class AsUnaryIntrinsicData a where
-  as_unary_intrinsic :: String -> a -> UnaryIntrinsicData
+  asUnaryIntrinsic :: String -> a -> UnaryIntrinsicData
 
 -- Unary integer operations.
 instance AsUnaryIntrinsicData (Integer -> Integer) where
-  as_unary_intrinsic x f = UnaryIntrinsicData (Expr_name x) t un_op
+  asUnaryIntrinsic x f = UnaryIntrinsicData (Expr_name x) t un_op
     where
       t = Unquantified $ CT_arrow [ CT_int ] CT_int
-      un_op = \x -> case x of
+      un_op x = case x of
         E_lit_int y -> mk_success $ E_lit_int $ f y
         _ -> fail "expected an integer value; found something else"
 
 -- Unary Boolean operations
 instance AsUnaryIntrinsicData (Bool -> Bool) where
-  as_unary_intrinsic x f = UnaryIntrinsicData (Expr_name x) t un_op
+  asUnaryIntrinsic x f = UnaryIntrinsicData (Expr_name x) t un_op
     where
       t = Unquantified $ CT_arrow [ CT_bool ] CT_bool
       un_op = \x -> case x of
@@ -49,90 +50,90 @@ instance AsUnaryIntrinsicData (Bool -> Bool) where
         _ -> fail "expected an integer value; found something else"
 
 -- | Unary built-in operations.
-unary_builtins :: [ UnaryIntrinsicData ]
-unary_builtins = [
-  as_unary_intrinsic "-"   ((\x -> -x) :: Integer -> Integer),
-  as_unary_intrinsic "not" not ]
+unaryBuiltins :: [ UnaryIntrinsicData ]
+unaryBuiltins = [
+  asUnaryIntrinsic "-"   ((\x -> -x) :: Integer -> Integer),
+  asUnaryIntrinsic "not" not ]
 
-lookup_unary_builtin :: Expr_name -> QType -> DebugOr (Expr -> DebugOr Expr)
-lookup_unary_builtin x t = from_maybe maybe_op err_msg
+lookupUnaryBuiltin :: Expr_name -> QType -> DebugOr (Expr -> DebugOr Expr)
+lookupUnaryBuiltin x t = from_maybe maybe_op err_msg
   where
     has_sig x t (UnaryIntrinsicData y u _) = x == y && are_structurally_equal_qtype t u
     err_msg = "cannot find unary built-in `" ++ show x ++ "`"
-    maybe_op = fmap get_un_op_code $ find (has_sig x t) unary_builtins
+    maybe_op = getUnOpCode <$> find (has_sig x t) unaryBuiltins
 
 -- | A Binary intrinsic operation.
 data BinaryIntrinsicData =
   BinaryIntrinsicData Expr_name QType ((Expr, Expr) -> DebugOr Expr)
 
 -- | Retrieve the binary operation.
-get_bin_op_code :: BinaryIntrinsicData -> (Expr, Expr) -> DebugOr Expr
-get_bin_op_code (BinaryIntrinsicData _ _ op) = op
+getBinOpCode :: BinaryIntrinsicData -> (Expr, Expr) -> DebugOr Expr
+getBinOpCode (BinaryIntrinsicData _ _ op) = op
 
 -- FIXME: Can add another parameter to make sure the output type is the expected
 --        type.
 class AsBinaryIntrinsicData a where
-  as_binary_intrinsic :: String -> a -> BinaryIntrinsicData
+  asBinaryIntrinsic :: String -> a -> BinaryIntrinsicData
 
 -- Binary integer operations.
 instance AsBinaryIntrinsicData (Integer -> Integer -> Integer) where
-  as_binary_intrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
+  asBinaryIntrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
     where
       t = Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int
-      bin_op = \(x, y) -> case (x,y) of
+      bin_op (x,y) = case (x,y) of
         (E_lit_int x, E_lit_int y) -> mk_success $ E_lit_int $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Binary Boolean operations
 instance AsBinaryIntrinsicData (Bool -> Bool -> Bool) where
-  as_binary_intrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
+  asBinaryIntrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
     where
       t = Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_bool
-      bin_op = \(x, y) -> case (x,y) of
+      bin_op (x,y) = case (x,y) of
         (E_lit_bool x, E_lit_bool y) -> mk_success $ E_lit_bool $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Binary integer predicate.
 instance AsBinaryIntrinsicData (Integer -> Integer -> Bool) where
-  as_binary_intrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
+  asBinaryIntrinsic x f = BinaryIntrinsicData (Expr_name x) t bin_op
     where
       t = Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool
-      bin_op = \(x, y) -> case (x,y) of
+      bin_op (x,y) = case (x,y) of
         (E_lit_int x, E_lit_int y) -> mk_success $ E_lit_bool $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Need to use coercions?
-binary_builtins :: [ BinaryIntrinsicData ]
-binary_builtins = [
-  as_binary_intrinsic "+"   ((+)  :: Integer -> Integer -> Integer),
-  as_binary_intrinsic "-"   ((-)  :: Integer -> Integer -> Integer),
-  as_binary_intrinsic "*"   ((*)  :: Integer -> Integer -> Integer),
-  as_binary_intrinsic "/"   (div  :: Integer -> Integer -> Integer),
-  as_binary_intrinsic "rem" (rem  :: Integer -> Integer -> Integer),
-  as_binary_intrinsic "or"  ((||) :: Bool -> Bool -> Bool),
-  as_binary_intrinsic "and" ((&&) :: Bool -> Bool -> Bool),
-  as_binary_intrinsic "="   ((==) :: Integer -> Integer -> Bool),
-  as_binary_intrinsic "<>"  ((/=) :: Integer -> Integer -> Bool),
-  as_binary_intrinsic "<"   ((<)  :: Integer -> Integer -> Bool),
-  as_binary_intrinsic "<="  ((<=) :: Integer -> Integer -> Bool),
-  as_binary_intrinsic ">"   ((>)  :: Integer -> Integer -> Bool),
-  as_binary_intrinsic ">="  ((>=) :: Integer -> Integer -> Bool) ]
+binaryBuiltins :: [ BinaryIntrinsicData ]
+binaryBuiltins = [
+  asBinaryIntrinsic "+"   ((+)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "-"   ((-)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "*"   ((*)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "/"   (div  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "rem" (rem  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "or"  ((||) :: Bool -> Bool -> Bool),
+  asBinaryIntrinsic "and" ((&&) :: Bool -> Bool -> Bool),
+  asBinaryIntrinsic "="   ((==) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<>"  ((/=) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<"   ((<)  :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<="  ((<=) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic ">"   ((>)  :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic ">="  ((>=) :: Integer -> Integer -> Bool) ]
 
-lookup_binary_builtin :: Expr_name -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
-lookup_binary_builtin x t = from_maybe maybe_op err_msg
+lookupBinaryBuiltin :: Expr_name -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
+lookupBinaryBuiltin x t = from_maybe maybe_op err_msg
   where
     has_sig x t (BinaryIntrinsicData y u _) = x == y && are_structurally_equal_qtype t u
     err_msg = "cannot find built-in `" ++ show x ++ "`"
-    maybe_op = fmap get_bin_op_code $ find (has_sig x t) binary_builtins
+    maybe_op = getBinOpCode <$> find (has_sig x t) binaryBuiltins
 
-unary_ops :: [(Expr_name, QType)]
-unary_ops = [
+unaryOps :: [(Expr_name, QType)]
+unaryOps = [
   (Expr_name "-", Unquantified $ CT_arrow [ CT_int ] CT_int),
   (Expr_name "not", Unquantified $ CT_arrow [ CT_bool ] CT_bool) ]
 
 -- | A set of binary operations and their types.
-builtins_ctx :: Ctx
-builtins_ctx = extend_vars ops $ Ctx []
+builtinsCtx :: Ctx
+builtinsCtx = extend_vars ops $ Ctx []
   where
     ops = [
       (Expr_name "-",   Unquantified $ CT_arrow [ CT_int ] CT_int),

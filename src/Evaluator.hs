@@ -9,7 +9,7 @@ import Expressions (
   subst_exprs,
   CType(..), QType(..) )
 import Util.DebugOr ( DebugOr, require_or_else )
-import BuiltIns ( lookup_unary_builtin, lookup_binary_builtin )
+import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
 
 
 
@@ -65,12 +65,12 @@ eval_builtin x t vs = case vs of
 
 eval_unary_builtin :: Expr_name -> QType -> Expr -> DebugOr Expr
 eval_unary_builtin x t v = do
-    op <- lookup_unary_builtin x t
+    op <- lookupUnaryBuiltin x t
     op v
 
 eval_binary_builtin :: Expr_name -> QType -> (Expr, Expr) -> DebugOr Expr
 eval_binary_builtin x t vs = do
-    op <- lookup_binary_builtin x t
+    op <- lookupBinaryBuiltin x t
     op vs
 
 eval_exprs :: [Expr] -> DebugOr [Expr]

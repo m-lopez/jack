@@ -8,7 +8,7 @@ import Contexts ( Ctx(..) )
 import Typing ( synth_expr )
 import Util.DebugOr ( DebugOr(..), show_underlying )
 import Evaluator ( eval_expr )
-import BuiltIns ( builtins_ctx )
+import BuiltIns ( builtinsCtx )
 
 import Data.Char ( isSpace )
 import Control.Monad.Loops ( whileJust_ )
@@ -50,7 +50,7 @@ eval s = show_underlying v
   where
     v = do
       ast <- simple_parse s
-      (e, t) <- synth_expr builtins_ctx ast
+      (e, t) <- synth_expr builtinsCtx ast
       v <- eval_expr e
       return $ show v ++ " : " ++ show t
     pair x y = (x,y)
@@ -72,7 +72,7 @@ parseTree s = show_underlying $ simple_parse s
 typeSynth :: String -> DebugOr (Expr, QType)
 typeSynth s = do
   ast <- simple_parse s
-  (e, t) <- synth_expr builtins_ctx ast
+  (e, t) <- synth_expr builtinsCtx ast
   return (e, t)
 
 -- | Execution of a REPL command.

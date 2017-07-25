@@ -10,7 +10,7 @@ import Expressions (
   Expr_name(..),
   are_structurally_equal_expr )
 import Typing ( check_expr )
-import BuiltIns ( builtins_ctx )
+import BuiltIns ( builtinsCtx )
 import Contexts ( Ctx(..), Binding(..) )
 import Util.DebugOr ( DebugOr(..) )
 
@@ -133,17 +133,17 @@ overloadTests = [
 builtinCtxTests :: [CheckTest]
 builtinCtxTests = [
   CheckTest
-    builtins_ctx
+    builtinsCtx
     (A_app (A_name (Ast_name "+")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_int)
     (E_app (var "+" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
   CheckTest
-    builtins_ctx
+    builtinsCtx
     (A_app (A_name (Ast_name "rem")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_int)
     (E_app (var "rem" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
   CheckTest
-    builtins_ctx
+    builtinsCtx
     (A_app (A_name (Ast_name "=")) [A_lit_int 2,A_lit_int 2])
     (Unquantified CT_bool)
     (E_app (var "=" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_bool) [ E_lit_int 2, E_lit_int 2 ]) ]
