@@ -35,18 +35,18 @@ class AsUnaryIntrinsicData a where
 instance AsUnaryIntrinsicData (Integer -> Integer) where
   asUnaryIntrinsic x f = UnaryIntrinsicData (ExprName x) t un_op
     where
-      t = Unquantified $ CT_arrow [ CT_int ] CT_int
+      t = Unquantified $ CTArrow [ CTInt ] CTInt
       un_op x = case x of
-        E_lit_int y -> mkSuccess $ E_lit_int $ f y
+        ELitInt y -> mkSuccess $ ELitInt $ f y
         _ -> fail "expected an integer value; found something else"
 
 -- Unary Boolean operations
 instance AsUnaryIntrinsicData (Bool -> Bool) where
   asUnaryIntrinsic x f = UnaryIntrinsicData (ExprName x) t un_op
     where
-      t = Unquantified $ CT_arrow [ CT_bool ] CT_bool
+      t = Unquantified $ CTArrow [ CTBool ] CTBool
       un_op = \x -> case x of
-        E_lit_bool y -> mkSuccess $ E_lit_bool $ f y
+        ELitBool y -> mkSuccess $ ELitBool $ f y
         _ -> fail "expected an integer value; found something else"
 
 -- | Unary built-in operations.
@@ -79,27 +79,27 @@ class AsBinaryIntrinsicData a where
 instance AsBinaryIntrinsicData (Integer -> Integer -> Integer) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
-      t = Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int
+      t = Unquantified $ CTArrow [ CTInt, CTInt ] CTInt
       bin_op (x,y) = case (x,y) of
-        (E_lit_int x, E_lit_int y) -> mkSuccess $ E_lit_int $ f x y
+        (ELitInt x, ELitInt y) -> mkSuccess $ ELitInt $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Binary Boolean operations
 instance AsBinaryIntrinsicData (Bool -> Bool -> Bool) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
-      t = Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_bool
+      t = Unquantified $ CTArrow [ CTBool, CTBool ] CTBool
       bin_op (x,y) = case (x,y) of
-        (E_lit_bool x, E_lit_bool y) -> mkSuccess $ E_lit_bool $ f x y
+        (ELitBool x, ELitBool y) -> mkSuccess $ ELitBool $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Binary integer predicate.
 instance AsBinaryIntrinsicData (Integer -> Integer -> Bool) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
-      t = Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool
+      t = Unquantified $ CTArrow [ CTInt, CTInt ] CTBool
       bin_op (x,y) = case (x,y) of
-        (E_lit_int x, E_lit_int y) -> mkSuccess $ E_lit_bool $ f x y
+        (ELitInt x, ELitInt y) -> mkSuccess $ ELitBool $ f x y
         _ -> fail "expected an integer value; found something else"
 
 -- Need to use coercions?
@@ -128,28 +128,28 @@ lookupBinaryBuiltin x t = fromMaybe maybe_op err_msg
 
 unaryOps :: [(ExprName, QType)]
 unaryOps = [
-  (ExprName "-", Unquantified $ CT_arrow [ CT_int ] CT_int),
-  (ExprName "not", Unquantified $ CT_arrow [ CT_bool ] CT_bool) ]
+  (ExprName "-", Unquantified $ CTArrow [ CTInt ] CTInt),
+  (ExprName "not", Unquantified $ CTArrow [ CTBool ] CTBool) ]
 
 -- | A set of binary operations and their types.
 builtinsCtx :: Ctx
 builtinsCtx = extendVars ops $ Ctx []
   where
     ops = [
-      (ExprName "-",   Unquantified $ CT_arrow [ CT_int ] CT_int),
-      (ExprName "not", Unquantified $ CT_arrow [ CT_bool ] CT_bool),
-      (ExprName "+",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int),
-      (ExprName "-",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int),
-      (ExprName "*",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int),
-      (ExprName "/",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int),
-      (ExprName "rem", Unquantified $ CT_arrow [ CT_int, CT_int ] CT_int),
-      (ExprName "or",  Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_int),
-      (ExprName "and", Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_int),
-      (ExprName "=",   Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_bool),
-      (ExprName "=",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool),
-      (ExprName "<>",  Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool),
-      (ExprName "<>",  Unquantified $ CT_arrow [ CT_bool, CT_bool ] CT_bool),
-      (ExprName "<",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool),
-      (ExprName "<=",  Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool),
-      (ExprName ">",   Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool),
-      (ExprName ">=",  Unquantified $ CT_arrow [ CT_int, CT_int ] CT_bool) ]
+      (ExprName "-",   Unquantified $ CTArrow [ CTInt ] CTInt),
+      (ExprName "not", Unquantified $ CTArrow [ CTBool ] CTBool),
+      (ExprName "+",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+      (ExprName "-",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+      (ExprName "*",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+      (ExprName "/",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+      (ExprName "rem", Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+      (ExprName "or",  Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
+      (ExprName "and", Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
+      (ExprName "=",   Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
+      (ExprName "=",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+      (ExprName "<>",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+      (ExprName "<>",  Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
+      (ExprName "<",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+      (ExprName "<=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+      (ExprName ">",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+      (ExprName ">=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool) ]

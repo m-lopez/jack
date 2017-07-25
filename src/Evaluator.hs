@@ -27,16 +27,16 @@ import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
 -- We allow Maybe to catch compiler errors that lead to an unsound type system.
 evalExpr :: Expr -> DebugOr Expr
 evalExpr e = case e of
-  E_lit_bool _ ->
+  ELitBool _ ->
     return e
-  E_lit_int _ ->
+  ELitInt _ ->
     return e
-  E_var _ _ ->
+  EVar _ _ ->
     return e
-  E_abs _ _ ->
+  EAbs _ _ ->
     return e
-  E_app e es -> evalApp e es
-  E_if c e1 e2 -> do
+  EApp e es -> evalApp e es
+  EIf c e1 e2 -> do
     res <- evalExpr c
     b   <- asBool res
     if b then evalExpr e1 else evalExpr e2
@@ -46,8 +46,8 @@ evalApp e es = do
     vs <- evalExprs es
     f  <- evalExpr e
     case f of
-      E_abs xs e' -> evalLambdaApp e' xs vs
-      E_var x t   -> evalBuiltin x t vs
+      EAbs xs e' -> evalLambdaApp e' xs vs
+      EVar x t   -> evalBuiltin x t vs
       _           -> fail "callee is not callable"
 
 evalLambdaApp :: Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
@@ -78,10 +78,10 @@ evalExprs = traverse evalExpr
 
 asLambda :: Expr -> DebugOr ([(ExprName, CType)], Expr)
 asLambda e = case e of
-  E_abs params e' -> return (params, e')
+  EAbs params e' -> return (params, e')
   _               -> fail "callee is not callable"
 
 asBool :: Expr -> DebugOr Bool
 asBool e = case e of
-  E_lit_bool b -> return b
+  ELitBool b -> return b
   _            -> fail "value is not a Boolean"

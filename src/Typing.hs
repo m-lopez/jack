@@ -62,9 +62,9 @@ summerizeForm ast = case ast of
 
 requireSingleton :: OverloadSet -> Ast -> DebugOr (Expr, QType)
 requireSingleton ovlds ast = case interps ovlds of
-  []     -> fail $ "no viable interpretation of " ++ summerizeForm ast
-  v : [] -> return v
-  _      -> fail $ "ambiguous interpretation for " ++ summerizeForm ast
+  []  -> fail $ "no viable interpretation of " ++ summerizeForm ast
+  [v] -> return v
+  _   -> fail $ "ambiguous interpretation for " ++ summerizeForm ast
 
 requireUnquantifiedType :: QType -> DebugOr CType
 requireUnquantifiedType qt = case qt of
@@ -80,7 +80,7 @@ requireUnquantifiedTypes = traverse requireUnquantifiedType
 
 requireArrowType :: QType -> DebugOr ([CType], CType)
 requireArrowType qt = case qt of
-  Unquantified (CT_arrow t1 t2) -> return (t1, t2)
+  Unquantified (CTArrow t1 t2) -> return (t1, t2)
   _ -> fail $ "expected an arrow type; got a " ++ show qt
 
 requireTypeEqs :: [CType] -> [CType] -> DebugOr ()
@@ -103,7 +103,7 @@ viable ctx f t ps = do
   _               <- requireArity ps src_ts
   typed_args      <- checkExprs ctx $ zip ps $ fmap Unquantified src_ts
   let args = map fst typed_args in
-    return (E_app f args, Unquantified tgt_t)
+    return (EApp f args, Unquantified tgt_t)
 
 -- Perform C++-style overload resolution for the call `p ps`.
 resolve :: Ctx -> Ast -> [Ast] -> DebugOr OverloadSet
@@ -134,7 +134,7 @@ lookupVar (AstName n) (Ctx bindings) =
     var_binding_has_name v b = case b of BVar v' t -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
   in DebugOr $ Right $ OverloadSet $
-    map (\(BVar x t) -> (E_var x t, t)) overloads
+    map (\(BVar x t) -> (EVar x t, t)) overloads
 
 -- Select from an overload on type.
 selectByType :: QType -> OverloadSet -> DebugOr (Expr, QType)
@@ -163,10 +163,10 @@ checkUnquantType ctx p = case p of
   A_arrow ps p -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p
-    return $ CT_arrow src_ts tgt_t
+    return $ CTArrow src_ts tgt_t
   A_name xt ->
     let (AstName n) = xt in
-      return $ CT_var $ TypeName n
+      return $ CTVar $ TypeName n
   A_abs _ _ ->
     fail $ "expected type; got " ++ summerizeForm p
   A_app _ _ ->
@@ -194,9 +194,9 @@ checkUnquantTypes ctx = traverse (checkUnquantType ctx)
 synthExpr :: Ctx -> Ast -> DebugOr (Expr, QType)
 synthExpr ctx p = case p of
   A_lit_bool b  ->
-    return (E_lit_bool b, Unquantified CT_bool)
+    return (ELitBool b, Unquantified CTBool)
   A_lit_int i   ->
-    return (E_lit_int i, Unquantified CT_int)
+    return (ELitInt i, Unquantified CTInt)
   A_name px -> do
     viable <- lookupVar px ctx
     requireSingleton viable p
@@ -208,16 +208,16 @@ synthExpr ctx p = case p of
       ts      <- checkUnquantTypes ctx pts
       (e, t2) <- synthExpr (extendVars (zip vars $ map Unquantified ts) ctx) p
       t2'     <- requireUnquantifiedType t2
-      return (E_abs (zip vars ts) e, Unquantified $ CT_arrow ts t2')
+      return (EAbs (zip vars ts) e, Unquantified $ CTArrow ts t2')
   A_app p1 p2 -> do
     viable <- resolve ctx p1 p2
     requireSingleton viable p
   A_if p1 p2 p3 -> do
-    (e1, _)  <- checkExpr ctx p1 (Unquantified CT_bool)
+    (e1, _)  <- checkExpr ctx p1 (Unquantified CTBool)
     (e2, t2) <- synthExpr ctx p2
     (e3, t3) <- synthExpr ctx p3
     requireOrElse (areStructurallyEqualQType t2 t3) "type mismatch"
-    return (E_if e1 e2 e3, t2)
+    return (EIf e1 e2 e3, t2)
   _ -> fail $ "expected an expression to synthesize; got a " ++ summerizeForm p
 
 synthExprs :: Ctx -> [Ast] -> DebugOr [(Expr, QType)]
@@ -227,11 +227,11 @@ synthExprs ctx = traverse (synthExpr ctx)
 checkExpr :: Ctx -> Ast -> QType -> DebugOr (Expr, QType)
 checkExpr ctx p ret_t = case p of
   A_lit_bool b  -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CT_bool)) "need better err msg"
-    return (E_lit_bool b, Unquantified CT_bool)
+    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTBool)) "need better err msg"
+    return (ELitBool b, Unquantified CTBool)
   A_lit_int i   -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CT_int)) "need better err msg"
-    return (E_lit_int i, Unquantified CT_int)
+    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTInt)) "need better err msg"
+    return (ELitInt i, Unquantified CTInt)
   A_name px -> do
     viable <- lookupVar px ctx
     selectByType ret_t viable
@@ -245,15 +245,15 @@ checkExpr ctx p ret_t = case p of
       requireTypeEqs src_ts src_ts'
       (e, tgt_t')     <- checkExpr (extendVars (zip vars $ map Unquantified src_ts') ctx) p (Unquantified tgt_t)
       requireOrElse (areStructurallyEqualQType tgt_t' (Unquantified tgt_t)) "type mismatch: unimplemented"
-      return (E_abs (zip vars src_ts) e, ret_t)
+      return (EAbs (zip vars src_ts) e, ret_t)
   A_app p1 p2 -> do
     viable <- resolve ctx p1 p2
     selectByType ret_t viable
   A_if p1 p2 p3 -> do
-    (e1, _)  <- checkExpr ctx p1 (Unquantified CT_bool)
+    (e1, _)  <- checkExpr ctx p1 (Unquantified CTBool)
     (e2, _) <- checkExpr ctx p2 ret_t
     (e3, _) <- checkExpr ctx p3 ret_t
-    return (E_if e1 e2 e3, ret_t)
+    return (EIf e1 e2 e3, ret_t)
   _ -> fail $ "expected an expression to check; got a " ++ summerizeForm p
 
 checkExprs :: Ctx -> [(Ast, QType)] -> DebugOr [(Expr, QType)]

@@ -16,7 +16,7 @@ import Util.DebugOr ( DebugOr(debugRep), mkSuccess )
 
 -- FIXME: Move this shorthand into a test utils.
 var :: String -> QType -> Expr
-var x = E_var (ExprName x)
+var x = EVar (ExprName x)
 
 -- Applies a binary relation under a `DebugOr`.
 -- FIXME: Add this to a common collection of test utilities.
@@ -46,57 +46,57 @@ mkPassingEvalTests = TestList . map mkPassingEvalTest
 simpleTests :: [ EvalEqTest ]
 simpleTests = [
   EvalEqTest
-    (E_lit_int 2)
-    (E_lit_int 2),
+    (ELitInt 2)
+    (ELitInt 2),
   EvalEqTest
-    (E_lit_bool True)
-    (E_lit_bool True),
+    (ELitBool True)
+    (ELitBool True),
   EvalEqTest
-    (E_abs [] $ E_lit_bool True)
-    (E_abs [] $ E_lit_bool True)
+    (EAbs [] $ ELitBool True)
+    (EAbs [] $ ELitBool True)
   ]
 
 mkBinaryOpType :: CType -> QType
-mkBinaryOpType t = Unquantified $ CT_arrow [ t, t ] t
+mkBinaryOpType t = Unquantified $ CTArrow [ t, t ] t
 
 mkBinaryPredType :: CType -> QType
-mkBinaryPredType t = Unquantified $ CT_arrow [ t, t ] CT_bool
+mkBinaryPredType t = Unquantified $ CTArrow [ t, t ] CTBool
 
 deltaTests :: [ EvalEqTest ]
 deltaTests = [
   EvalEqTest
-    (E_app (var "+" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 5),
+    (EApp (var "+" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 5),
   EvalEqTest
-    (E_app (var "-" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int (-1)),
+    (EApp (var "-" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt (-1)),
   EvalEqTest
-    (E_app (var "*" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 6),
+    (EApp (var "*" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 6),
   EvalEqTest
-    (E_app (var "/" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 0),
+    (EApp (var "/" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 0),
   EvalEqTest
-    (E_app (var "rem" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 2),
+    (EApp (var "rem" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 2),
   EvalEqTest
-    (E_app (var "=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False),
+    (EApp (var "=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False),
   EvalEqTest
-    (E_app (var "<>" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<>" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var "<" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var "<=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var ">" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False),
+    (EApp (var ">" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False),
   EvalEqTest
-    (E_app (var ">=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False) ]
+    (EApp (var ">=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False) ]
 
 -- | Assemble each test suite into a named collection.
 evalSpec :: Test

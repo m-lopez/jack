@@ -30,19 +30,19 @@ newtype TypeName = TypeName String deriving (Show, Eq)
 --
 
 data Expr =
-    E_lit_bool Bool
-  | E_lit_int  Integer
-  | E_var      ExprName QType
-  | E_abs      [(ExprName, CType)] Expr
-  | E_app      Expr [Expr]
-  | E_if       Expr Expr Expr
+    ELitBool Bool
+  | ELitInt  Integer
+  | EVar      ExprName QType
+  | EAbs      [(ExprName, CType)] Expr
+  | EApp      Expr [Expr]
+  | EIf       Expr Expr Expr
   deriving (Show)
 
 -------------------------------------
 -- Proposition syntax
 --
 
-data Prop = P_true deriving (Show)
+data Prop = PTrue deriving (Show)
 
 -------------------------------------
 -- Type syntax
@@ -54,10 +54,10 @@ data QType =
   deriving (Show)
 
 data CType =
-    CT_bool
-  | CT_int
-  | CT_arrow [CType] CType
-  | CT_var   TypeName
+    CTBool
+  | CTInt
+  | CTArrow [CType] CType
+  | CTVar   TypeName
   deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -68,16 +68,16 @@ substExpr x t v e =
   let
     subst_on = substExpr x t v  -- subst on, wayne! subst on, garth!
   in case e of
-    E_lit_bool _      -> e
-    E_lit_int  _      -> e
-    E_var y t'        -> if (x == y) && areStructurallyEqualQType t t' then v else e
-    E_abs params body -> if any is_x_t params
+    ELitBool _      -> e
+    ELitInt  _      -> e
+    EVar y t'        -> if (x == y) && areStructurallyEqualQType t t' then v else e
+    EAbs params body -> if any is_x_t params
                            then e
-                           else E_abs params $ subst_on body
+                           else EAbs params $ subst_on body
       where
         is_x_t (y,t') = (x == y) && (areStructurallyEqualQType t $ Unquantified t')
-    E_app e1 args     -> E_app (subst_on e1) (map subst_on args)
-    E_if c e1 e2      -> E_if (subst_on c) (subst_on e1) (subst_on e2)
+    EApp e1 args     -> EApp (subst_on e1) (map subst_on args)
+    EIf c e1 e2      -> EIf (subst_on c) (subst_on e1) (subst_on e2)
 
 substExprs :: [((ExprName, QType), Expr)] -> Expr -> Expr
 substExprs param_map = foldr (.) id subst_ons
@@ -100,15 +100,15 @@ areStructurallyEqualQType t1 t2 = case (t1,t2) of
 -- Type equality on unquantified types.
 areStructurallyEqualCType :: CType -> CType -> Bool
 areStructurallyEqualCType t1 t2 = case (t1,t2) of
-  (CT_bool, CT_bool)         -> True
-  (CT_int,  CT_int)          -> True
-  (CT_arrow src_t1 tgt_t1, CT_arrow src_t2 tgt_t2) ->
+  (CTBool, CTBool)         -> True
+  (CTInt,  CTInt)          -> True
+  (CTArrow src_t1 tgt_t1, CTArrow src_t2 tgt_t2) ->
     let
       same_lengths = length src_t1 == length src_t2
       sources_eq   = all (uncurry areStructurallyEqualCType) (zip src_t1 src_t2)
       targets_eq   = areStructurallyEqualCType tgt_t1 tgt_t2
     in same_lengths && sources_eq && targets_eq
-  (CT_var (TypeName x1), CT_var (TypeName x2)) -> x1 == x2
+  (CTVar (TypeName x1), CTVar (TypeName x2)) -> x1 == x2
   _ -> False
 
 -- Structural equality on expressions.
@@ -118,15 +118,15 @@ areStructurallyEqualExpr x y = let
     are_bindings_eq (ExprName x, t) (ExprName x', t') = x == x' && areStructurallyEqualCType t t'
     are_list_bindings_eq bs bs' = (length bs == length bs') && all (uncurry are_bindings_eq) (zip bs bs')
   in case (x,y) of
-    (E_lit_bool b, E_lit_bool b') -> b == b'
-    (E_lit_int n, E_lit_int n') -> n == n'
-    (E_var x t, E_var x' t') -> x == x' && areStructurallyEqualQType t t'
-    (E_abs bs e, E_abs bs' e') ->
+    (ELitBool b, ELitBool b') -> b == b'
+    (ELitInt n, ELitInt n') -> n == n'
+    (EVar x t, EVar x' t') -> x == x' && areStructurallyEqualQType t t'
+    (EAbs bs e, EAbs bs' e') ->
       are_list_bindings_eq bs bs' && areStructurallyEqualExpr e e'
-    (E_app e es, E_app e' es') ->
+    (EApp e es, EApp e' es') ->
       areStructurallyEqualExpr e e' && (length es == length es') &&
         all (uncurry areStructurallyEqualExpr) (zip es es')
-    (E_if e1 e2 e3, E_if e1' e2' e3') ->
+    (EIf e1 e2 e3, EIf e1' e2' e3') ->
       areStructurallyEqualExpr e1 e1' &&
         areStructurallyEqualExpr e2 e2' &&
           areStructurallyEqualExpr e3 e3'
