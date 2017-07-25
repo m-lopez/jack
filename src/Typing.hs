@@ -113,6 +113,8 @@ resolve ctx p ps = case p of
     viables <- only_successful $ map (\(f, t) -> viable ctx f t ps) $ interps cands  -- Computes viable functions
     _       <- require_or_else (not $ null viables) "no valid interpretations for application"
     return $ OverloadSet viables
+  -- FIXME: Should support lambdas.
+  ast -> fail $ "attempted overload resolution on an uncallable expression; got " ++ show ast
 
 
 
