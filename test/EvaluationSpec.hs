@@ -15,6 +15,7 @@ import Util.DebugOr ( DebugOr(debug_rep), mk_success )
 ------ Helper functions --------------------------------------------------------
 
 -- FIXME: Move this shorthand into a test utils.
+var :: String -> QType -> Expr
 var x = E_var (Expr_name x)
 
 -- Applies a binary relation under a `DebugOr`.
@@ -77,7 +78,7 @@ deltaTests = [
     (E_lit_int 0),
   EvalEqTest
     (E_app (var "rem" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 1),
+    (E_lit_int 2),
   EvalEqTest
     (E_app (var "=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
     (E_lit_bool False),
