@@ -1,9 +1,9 @@
 module ParserSpec ( parserSpec ) where
 
 import Test.HUnit ( assertEqual, Test(TestCase, TestList, TestLabel) )
-import Parser ( simple_parse, Ast(..), Ast_name (..) )
+import Parser ( simpleParse, Ast(..), AstName (..) )
 import Text.Parsec ( parse )
-import Util.DebugOr ( debug_rep )
+import Util.DebugOr ( debugRep )
 
 
 
@@ -11,11 +11,11 @@ import Util.DebugOr ( debug_rep )
 
 -- Creates an AST name.
 sym :: String -> Ast
-sym s = A_name $ Ast_name s
+sym = AName . AstName
 
 -- Run the parser
 tryParse :: String -> Either String Ast
-tryParse s = case debug_rep $ simple_parse s of
+tryParse s = case debugRep $ simpleParse s of
   Left x  -> Left $ show x
   Right x -> Right x
 
@@ -40,44 +40,44 @@ mkSyntaxTests = TestList . map mkSyntaxTest
 -- Simple expressions
 simpleExprTests :: [SyntaxTest]
 simpleExprTests = [
-  SyntaxTest "23"      (A_lit_int 23),
-  SyntaxTest "true"    (A_lit_bool True),
-  SyntaxTest "false"   (A_lit_bool False),
-  SyntaxTest "(1)"     (A_lit_int 1),
-  SyntaxTest "((1))"   (A_lit_int 1),
-  SyntaxTest "(((1)))" (A_lit_int 1) ]
+  SyntaxTest "23"      (ALitInt 23),
+  SyntaxTest "true"    (ALitBool True),
+  SyntaxTest "false"   (ALitBool False),
+  SyntaxTest "(1)"     (ALitInt 1),
+  SyntaxTest "((1))"   (ALitInt 1),
+  SyntaxTest "(((1)))" (ALitInt 1) ]
 
 -- Binary operations tests.
 binOpTests :: [SyntaxTest]
 binOpTests = [
   SyntaxTest
     "n + m"
-    (A_app (sym "+") [ sym "n", sym "m" ]),
+    (AApp (sym "+") [ sym "n", sym "m" ]),
   SyntaxTest
     "n - m"
-    (A_app (sym "-") [ sym "n", sym "m" ]),
+    (AApp (sym "-") [ sym "n", sym "m" ]),
   SyntaxTest
     "n - -m"
-    (A_app (sym "-") [ sym "n", A_app (sym "-") [ sym "m" ]]),
+    (AApp (sym "-") [ sym "n", AApp (sym "-") [ sym "m" ]]),
   SyntaxTest
     "n rem 2 = k"
-    (A_app (sym "=") [ A_app (sym "rem") [ sym "n", A_lit_int 2 ], sym "k" ]),
+    (AApp (sym "=") [ AApp (sym "rem") [ sym "n", ALitInt 2 ], sym "k" ]),
   SyntaxTest
     "n rem 2"
-    (A_app (sym "rem") [ sym "n", A_lit_int 2 ]) ]
+    (AApp (sym "rem") [ sym "n", ALitInt 2 ]) ]
 
 -- Lambda tests.
 lambdaTests :: [SyntaxTest]
 lambdaTests = [
   SyntaxTest
     "\\(n: Int) n"
-    (A_abs [(Ast_name "n", A_type_int)] $ sym "n"),
+    (AAbs [(AstName "n", ATypeInt)] $ sym "n"),
   SyntaxTest
     "\\(n: Int, m: Int) n + m"
-    (A_abs [(Ast_name "n", A_type_int), (Ast_name "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ]),
+    (AAbs [(AstName "n", ATypeInt), (AstName "m", ATypeInt)] $ AApp (sym "+") [ sym "n", sym "m" ]),
   SyntaxTest
     "\\(n:Int)\\(m:Int) n + m"
-    (A_abs [(Ast_name "n", A_type_int)] $ A_abs [(Ast_name "m", A_type_int)] $ A_app (sym "+") [ sym "n", sym "m" ])
+    (AAbs [(AstName "n", ATypeInt)] $ AAbs [(AstName "m", ATypeInt)] $ AApp (sym "+") [ sym "n", sym "m" ])
   ]
 
 -- Conditional tests.
@@ -85,10 +85,10 @@ conditionalTests :: [SyntaxTest]
 conditionalTests = [
   SyntaxTest
     "if false then 1 else 2"
-    (A_if (A_lit_bool False) (A_lit_int 1) (A_lit_int 2)),
+    (AIf (ALitBool False) (ALitInt 1) (ALitInt 2)),
   SyntaxTest
     "if b then \\(n:Int) n - 1 else \\(m:Int) m + 1"
-    (A_if (sym "b") (A_abs [(Ast_name "n", A_type_int)] (A_app (sym "-") [ sym "n", A_lit_int 1 ])) (A_abs [(Ast_name "m", A_type_int)] (A_app (sym "+") [ (sym "m"), (A_lit_int 1) ])))
+    (AIf (sym "b") (AAbs [(AstName "n", ATypeInt)] (AApp (sym "-") [ sym "n", ALitInt 1 ])) (AAbs [(AstName "m", ATypeInt)] (AApp (sym "+") [ (sym "m"), (ALitInt 1) ])))
   ]
 
 -- Application tests.
@@ -96,22 +96,22 @@ appTests :: [SyntaxTest]
 appTests = [
   SyntaxTest
     "f x"
-    (A_app (sym "f") [ sym "x" ]),
+    (AApp (sym "f") [ sym "x" ]),
   SyntaxTest
     "f -x" -- If we want to treat `-` as unary, then we would get `n-m` -> `n(-m)`.
-    (A_app (sym "-") [ sym "f", sym "x" ]),
+    (AApp (sym "-") [ sym "f", sym "x" ]),
   SyntaxTest
     "f (-x)"
-    (A_app (sym "f") [ A_app (sym "-") [ sym "x" ] ]),
+    (AApp (sym "f") [ AApp (sym "-") [ sym "x" ] ]),
   SyntaxTest
     "f g x"
-    (A_app (sym "f") [ A_app (sym "g") [ sym "x" ] ]),
+    (AApp (sym "f") [ AApp (sym "g") [ sym "x" ] ]),
   SyntaxTest
     "f x + 1"
-    (A_app (sym "+") [ A_app (sym "f") [ sym "x"], A_lit_int 1 ]),
+    (AApp (sym "+") [ AApp (sym "f") [ sym "x"], ALitInt 1 ]),
   SyntaxTest
     "size xs = size ys and same_elts (xs, ys)"
-    (A_app (sym "and") [ A_app (sym "=") [ A_app (sym "size") [ sym "xs" ], A_app (sym "size") [ sym "ys" ] ], A_app (sym "same_elts") [ sym "xs", sym "ys" ] ] ) ]
+    (AApp (sym "and") [ AApp (sym "=") [ AApp (sym "size") [ sym "xs" ], AApp (sym "size") [ sym "ys" ] ], AApp (sym "same_elts") [ sym "xs", sym "ys" ] ] ) ]
 
 -- | Assemble each test suite into a named collection.
 parserSpec :: Test

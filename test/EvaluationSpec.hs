@@ -5,10 +5,10 @@ import Expressions (
   Expr(..),
   CType(..),
   QType(..),
-  Expr_name(..),
-  are_structurally_equal_expr )
-import Evaluator ( eval_expr )
-import Util.DebugOr ( DebugOr(debug_rep), mk_success )
+  ExprName(..),
+  areStructurallyEqualExpr )
+import Evaluator ( evalExpr )
+import Util.DebugOr ( DebugOr(debugRep), mkSuccess )
 
 
 
@@ -16,12 +16,12 @@ import Util.DebugOr ( DebugOr(debug_rep), mk_success )
 
 -- FIXME: Move this shorthand into a test utils.
 var :: String -> QType -> Expr
-var x = E_var (Expr_name x)
+var x = EVar (ExprName x)
 
 -- Applies a binary relation under a `DebugOr`.
 -- FIXME: Add this to a common collection of test utilities.
 applyRelation :: (a -> b -> Bool) -> DebugOr a -> DebugOr b -> Bool
-applyRelation r a b = case (debug_rep a, debug_rep b) of
+applyRelation r a b = case (debugRep a, debugRep b) of
   (Right a', Right b') -> r a' b'
   _                    -> False
 
@@ -31,10 +31,10 @@ mkPassingEvalTest :: EvalEqTest -> Test
 mkPassingEvalTest x = TestCase $ assertBool name cond
   where
     e    = getUneval x
-    v    = eval_expr e
+    v    = evalExpr e
     expe = getExpectedValue x
     name = show e ++ " --> " ++ show expe
-    cond = applyRelation are_structurally_equal_expr (mk_success expe) v
+    cond = applyRelation areStructurallyEqualExpr (mkSuccess expe) v
 
 mkPassingEvalTests :: [ EvalEqTest ] -> Test
 mkPassingEvalTests = TestList . map mkPassingEvalTest
@@ -46,57 +46,57 @@ mkPassingEvalTests = TestList . map mkPassingEvalTest
 simpleTests :: [ EvalEqTest ]
 simpleTests = [
   EvalEqTest
-    (E_lit_int 2)
-    (E_lit_int 2),
+    (ELitInt 2)
+    (ELitInt 2),
   EvalEqTest
-    (E_lit_bool True)
-    (E_lit_bool True),
+    (ELitBool True)
+    (ELitBool True),
   EvalEqTest
-    (E_abs [] $ E_lit_bool True)
-    (E_abs [] $ E_lit_bool True)
+    (EAbs [] $ ELitBool True)
+    (EAbs [] $ ELitBool True)
   ]
 
 mkBinaryOpType :: CType -> QType
-mkBinaryOpType t = Unquantified $ CT_arrow [ t, t ] t
+mkBinaryOpType t = Unquantified $ CTArrow [ t, t ] t
 
 mkBinaryPredType :: CType -> QType
-mkBinaryPredType t = Unquantified $ CT_arrow [ t, t ] CT_bool
+mkBinaryPredType t = Unquantified $ CTArrow [ t, t ] CTBool
 
 deltaTests :: [ EvalEqTest ]
 deltaTests = [
   EvalEqTest
-    (E_app (var "+" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 5),
+    (EApp (var "+" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 5),
   EvalEqTest
-    (E_app (var "-" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int (-1)),
+    (EApp (var "-" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt (-1)),
   EvalEqTest
-    (E_app (var "*" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 6),
+    (EApp (var "*" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 6),
   EvalEqTest
-    (E_app (var "/" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 0),
+    (EApp (var "/" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 0),
   EvalEqTest
-    (E_app (var "rem" $ mkBinaryOpType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_int 2),
+    (EApp (var "rem" $ mkBinaryOpType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitInt 2),
   EvalEqTest
-    (E_app (var "=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False),
+    (EApp (var "=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False),
   EvalEqTest
-    (E_app (var "<>" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<>" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var "<" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var "<=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool True),
+    (EApp (var "<=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool True),
   EvalEqTest
-    (E_app (var ">" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False),
+    (EApp (var ">" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False),
   EvalEqTest
-    (E_app (var ">=" $ mkBinaryPredType CT_int) [ E_lit_int 2, E_lit_int 3 ])
-    (E_lit_bool False) ]
+    (EApp (var ">=" $ mkBinaryPredType CTInt) [ ELitInt 2, ELitInt 3 ])
+    (ELitBool False) ]
 
 -- | Assemble each test suite into a named collection.
 evalSpec :: Test

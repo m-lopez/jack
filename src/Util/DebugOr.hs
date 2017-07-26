@@ -12,12 +12,12 @@
 
 module Util.DebugOr (
   DebugOr(..),
-  only_successful,
-  require_or_else,
-  mk_success,
-  from_maybe,
+  onlySuccessful,
+  requireOrElse,
+  mkSuccess,
+  fromMaybe,
   fail,
-  show_underlying
+  showUnderlying
 ) where
 
 import Data.Either ( lefts, rights )
@@ -26,11 +26,11 @@ import Data.List ( intercalate )
 
 
 -- | A monad for debug errors. It wraps `Either` and is right-biased.
-newtype DebugOr a = DebugOr { debug_rep :: Either String a}
+newtype DebugOr a = DebugOr { debugRep :: Either String a}
 
 -- | Construct a successful value.
-mk_success :: a -> DebugOr a
-mk_success a = DebugOr $ Right a
+mkSuccess :: a -> DebugOr a
+mkSuccess a = DebugOr $ Right a
 
 -- | The `DebugOr` type is a `Functor`.
 instance Functor DebugOr where
@@ -62,24 +62,24 @@ instance Monad DebugOr where
   fail msg = DebugOr $ Left msg
 
 -- | Discard debug errors.
-only_successful :: [DebugOr a] -> DebugOr [a]
-only_successful dbgs = DebugOr $ Right $ rights $ fmap debug_rep dbgs
+onlySuccessful :: [DebugOr a] -> DebugOr [a]
+onlySuccessful dbgs = DebugOr $ Right $ rights $ fmap debugRep dbgs
 
 -- | Construct a nullary `DebugOr` that might be an error.
-require_or_else :: Bool -> String -> DebugOr ()
-require_or_else b msg = case b of
+requireOrElse :: Bool -> String -> DebugOr ()
+requireOrElse b msg = case b of
   True  -> return ()
   False -> fail msg
 
 -- | Transforms a `Maybe` into a `DebugOr` and explains the potential `Nothing`.
-from_maybe :: Maybe a -> String -> DebugOr a
-from_maybe a s = case a of
-  Just x  -> mk_success x
+fromMaybe :: Maybe a -> String -> DebugOr a
+fromMaybe a s = case a of
+  Just x  -> mkSuccess x
   Nothing -> fail s
 
 -- | Prints either the successful value or the error. Omits `Either` value
 --   constructors.
-show_underlying :: Show a => DebugOr a -> String
-show_underlying d = case debug_rep d of
+showUnderlying :: Show a => DebugOr a -> String
+showUnderlying d = case debugRep d of
   Left x  -> x
   Right x -> show x

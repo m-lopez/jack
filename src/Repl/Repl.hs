@@ -2,13 +2,13 @@
 
 module Repl.Repl where
 
-import Parser ( simple_parse )
+import Parser ( simpleParse )
 import Expressions ( QType(..), Expr )
 import Contexts ( Ctx(..) )
-import Typing ( synth_expr )
-import Util.DebugOr ( DebugOr(..), show_underlying )
-import Evaluator ( eval_expr )
-import BuiltIns ( builtins_ctx )
+import Typing ( synthExpr )
+import Util.DebugOr ( DebugOr(..), showUnderlying )
+import Evaluator ( evalExpr )
+import BuiltIns ( builtinsCtx )
 
 import Data.Char ( isSpace )
 import Control.Monad.Loops ( whileJust_ )
@@ -46,12 +46,12 @@ prompt s = flushStr s >> getLine
 
 -- | Code that parses, elaborates, and evaluates the code.
 eval :: String -> String
-eval s = show_underlying v
+eval s = showUnderlying v
   where
     v = do
-      ast <- simple_parse s
-      (e, t) <- synth_expr builtins_ctx ast
-      v <- eval_expr e
+      ast <- simpleParse s
+      (e, t) <- synthExpr builtinsCtx ast
+      v <- evalExpr e
       return $ show v ++ " : " ++ show t
     pair x y = (x,y)
 
@@ -64,23 +64,23 @@ strip_prefix cmd s = case stripPrefix cmd s of
 
 -- | Prints a parse tree.
 parseTree :: String -> String
-parseTree s = show_underlying $ simple_parse s
+parseTree s = showUnderlying $ simpleParse s
 
 -- | Prints the type of an expression.
 -- FIXME: We have demonstrated the need to print expressions in a debug and
 --        source code mode.
 typeSynth :: String -> DebugOr (Expr, QType)
 typeSynth s = do
-  ast <- simple_parse s
-  (e, t) <- synth_expr builtins_ctx ast
+  ast <- simpleParse s
+  (e, t) <- synthExpr builtinsCtx ast
   return (e, t)
 
 -- | Execution of a REPL command.
 executeCommand :: String -> IO ()
 executeCommand (strip_prefix "help" -> Just _) = putStrLn helpText
 executeCommand (strip_prefix "ast"  -> Just x) = putStrLn $ parseTree x
-executeCommand (strip_prefix "t"    -> Just x) = putStrLn $ show_underlying $ snd <$> typeSynth x
-executeCommand (strip_prefix "elab" -> Just x) = putStrLn $ show_underlying $ fst <$> typeSynth x
+executeCommand (strip_prefix "t"    -> Just x) = putStrLn $ showUnderlying $ snd <$> typeSynth x
+executeCommand (strip_prefix "elab" -> Just x) = putStrLn $ showUnderlying $ fst <$> typeSynth x
 executeCommand cmd = putStrLn $ unrecognizedCommand cmd
 
 -- | Code to evaluate an expression and print it.

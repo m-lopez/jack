@@ -2,15 +2,15 @@ module TypingSpec ( typingSpec ) where
 
 import Test.HUnit ( assertBool, Test(TestCase, TestList, TestLabel) )
 
-import Parser ( Ast(..), Ast_name (..) )
+import Parser ( Ast(..), AstName (..) )
 import Expressions (
   Expr(..),
   QType(..),
   CType(..),
-  Expr_name(..),
-  are_structurally_equal_expr )
-import Typing ( check_expr )
-import BuiltIns ( builtins_ctx )
+  ExprName(..),
+  areStructurallyEqualExpr )
+import Typing ( checkExpr )
+import BuiltIns ( builtinsCtx )
 import Contexts ( Ctx(..), Binding(..) )
 import Util.DebugOr ( DebugOr(..) )
 
@@ -27,14 +27,14 @@ emptyCtx = Ctx [ ]
 -- Creates an AST name.
 -- FIXME: Put into common test utils module.
 sym :: String -> Ast
-sym s = A_name $ Ast_name s
+sym = AName . AstName
 
 var :: String -> QType -> Expr
-var x = E_var $ Expr_name x
+var = EVar . ExprName
 
 -- Applies a binary relation under a `DebugOr`.
 applyRelation :: (a -> b -> Bool) -> DebugOr a -> DebugOr b -> Bool
-applyRelation r a b = case (debug_rep a, debug_rep b) of
+applyRelation r a b = case (debugRep a, debugRep b) of
   (Right a', Right b') -> r a' b'
   _                    -> False
 
@@ -48,9 +48,9 @@ mkPassingTypeCheckTest :: CheckTest -> Test
 mkPassingTypeCheckTest x = TestCase (assertBool name cond)
   where
     name = show ctx ++ " |- " ++ show p ++ ": " ++ show t ++ " => " ++ show e
-    cond = applyRelation are_structurally_equal_expr res exp
+    cond = applyRelation areStructurallyEqualExpr res exp
     res  = DebugOr $ Right e
-    exp  = fst <$> check_expr ctx p t
+    exp  = fst <$> checkExpr ctx p t
     ctx  = ctGetCtx x
     p    = ctGetCode x
     t    = ctGetType x
@@ -68,19 +68,19 @@ simpleTests :: [CheckTest]
 simpleTests = [
   CheckTest
     emptyCtx
-    (A_lit_bool True)
-    (Unquantified CT_bool)
-    (E_lit_bool True),
+    (ALitBool True)
+    (Unquantified CTBool)
+    (ELitBool True),
   CheckTest
     emptyCtx
-    (A_lit_int 23)
-    (Unquantified CT_int)
-    (E_lit_int 23),
+    (ALitInt 23)
+    (Unquantified CTInt)
+    (ELitInt 23),
   CheckTest
     emptyCtx
-    (A_if (A_lit_bool True) (A_lit_int 1) (A_lit_int 2))
-    (Unquantified CT_int)
-    (E_if (E_lit_bool True) (E_lit_int 1) (E_lit_int 2)) ]
+    (AIf (ALitBool True) (ALitInt 1) (ALitInt 2))
+    (Unquantified CTInt)
+    (EIf (ELitBool True) (ELitInt 1) (ELitInt 2)) ]
 
 -- Tests on closed expressions.
 -- FIXME: Need to support lambdas as a callable expression.
@@ -88,65 +88,65 @@ closedTests :: [CheckTest]
 closedTests = [ ]
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (Ast_name "n", A_type_int) ] (A_lit_int 2)) [ A_lit_int 3 ])
-  --   (Unquantified CT_int)
-  --   (E_app (E_abs [ (Expr_name "n", CT_int) ] (E_lit_int 2)) [ E_lit_int 3 ]),
+  --   (AApp (AAbs [ (AstName "n", ATypeInt) ] (ALitInt 2)) [ ALitInt 3 ])
+  --   (Unquantified CTInt)
+  --   (EApp (EAbs [ (ExprName "n", CTInt) ] (ELitInt 2)) [ ELitInt 3 ]),
   -- CheckTest
   --   emptyCtx
-  --   (A_app (A_abs [ (Ast_name "n", A_type_int) ] (sym "n")) [ A_lit_int 3 ])
-  --   (Unquantified CT_int)
-  --   (E_app (E_abs [ (Expr_name "n", CT_int) ] (var "n" $ Unquantified CT_int)) [ E_lit_int 3 ]) ]
+  --   (AApp (AAbs [ (AstName "n", ATypeInt) ] (sym "n")) [ ALitInt 3 ])
+  --   (Unquantified CTInt)
+  --   (EApp (EAbs [ (ExprName "n", CTInt) ] (var "n" $ Unquantified CTInt)) [ ELitInt 3 ]) ]
 
 -- Tests on expressions with free variables.
 simpleContextTests :: [CheckTest]
 simpleContextTests = [
   CheckTest
-    (Ctx [ B_var (Expr_name "n") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CTInt) ])
     (sym "n")
-    (Unquantified CT_int)
-    (var "n" $ Unquantified CT_int),
+    (Unquantified CTInt)
+    (var "n" $ Unquantified CTInt),
   CheckTest
-    (Ctx [ B_var (Expr_name "n") (Unquantified CT_int), B_var (Expr_name "m") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CTInt), BVar (ExprName "m") (Unquantified CTInt) ])
     (sym "n")
-    (Unquantified CT_int)
-    (var "n" $ Unquantified CT_int),
+    (Unquantified CTInt)
+    (var "n" $ Unquantified CTInt),
   CheckTest
-    (Ctx [ B_var (Expr_name "m") (Unquantified CT_int), B_var (Expr_name "n") (Unquantified CT_int) ])
+    (Ctx [ BVar (ExprName "m") (Unquantified CTInt), BVar (ExprName "n") (Unquantified CTInt) ])
     (sym "n")
-    (Unquantified CT_int)
-    (var "n" $ Unquantified CT_int) ]
+    (Unquantified CTInt)
+    (var "n" $ Unquantified CTInt) ]
 
 -- Tests that rely on overload resolution.
 overloadTests :: [CheckTest]
 overloadTests = [
   CheckTest
-    (Ctx [ B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_int] CT_int), B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
-    (A_app (sym "f") [ A_lit_int 2 ])
-    (Unquantified CT_int)
-    (E_app (var "f" $ Unquantified $ CT_arrow [CT_int] CT_int) [ E_lit_int 2 ]),
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
+    (AApp (sym "f") [ ALitInt 2 ])
+    (Unquantified CTInt)
+    (EApp (var "f" $ Unquantified $ CTArrow [CTInt] CTInt) [ ELitInt 2 ]),
   CheckTest
-    (Ctx [ B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_int] CT_int), B_var (Expr_name "f") (Unquantified $ CT_arrow [CT_bool] CT_bool) ])
-    (A_app (sym "f") [ A_lit_bool True ])
-    (Unquantified CT_bool)
-    (E_app (var "f" $ Unquantified $ CT_arrow [CT_bool] CT_bool) [ E_lit_bool True ]) ]
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
+    (AApp (sym "f") [ ALitBool True ])
+    (Unquantified CTBool)
+    (EApp (var "f" $ Unquantified $ CTArrow [CTBool] CTBool) [ ELitBool True ]) ]
 
 builtinCtxTests :: [CheckTest]
 builtinCtxTests = [
   CheckTest
-    builtins_ctx
-    (A_app (A_name (Ast_name "+")) [A_lit_int 2,A_lit_int 2])
-    (Unquantified CT_int)
-    (E_app (var "+" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
+    builtinsCtx
+    (AApp (AName (AstName "+")) [ALitInt 2,ALitInt 2])
+    (Unquantified CTInt)
+    (EApp (var "+" $ Unquantified $ CTArrow [CTInt, CTInt] CTInt) [ ELitInt 2, ELitInt 2 ]),
   CheckTest
-    builtins_ctx
-    (A_app (A_name (Ast_name "rem")) [A_lit_int 2,A_lit_int 2])
-    (Unquantified CT_int)
-    (E_app (var "rem" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_int) [ E_lit_int 2, E_lit_int 2 ]),
+    builtinsCtx
+    (AApp (AName (AstName "rem")) [ALitInt 2,ALitInt 2])
+    (Unquantified CTInt)
+    (EApp (var "rem" $ Unquantified $ CTArrow [CTInt, CTInt] CTInt) [ ELitInt 2, ELitInt 2 ]),
   CheckTest
-    builtins_ctx
-    (A_app (A_name (Ast_name "=")) [A_lit_int 2,A_lit_int 2])
-    (Unquantified CT_bool)
-    (E_app (var "=" $ Unquantified $ CT_arrow [CT_int, CT_int] CT_bool) [ E_lit_int 2, E_lit_int 2 ]) ]
+    builtinsCtx
+    (AApp (AName (AstName "=")) [ALitInt 2,ALitInt 2])
+    (Unquantified CTBool)
+    (EApp (var "=" $ Unquantified $ CTArrow [CTInt, CTInt] CTBool) [ ELitInt 2, ELitInt 2 ]) ]
 
 -- | Assemble each test suite into a named collection.
 typingSpec :: Test
