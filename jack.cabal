@@ -34,6 +34,7 @@ executable jack-exe
   main-is:             Main.hs
   ghc-options:         -Werror
                        -Wall
+                       -fwarn-tabs
                        -threaded
                        -rtsopts
                        -with-rtsopts=-N
@@ -53,6 +54,7 @@ test-suite jack-test
                        Parser ParserSpec Typing TypingSpec Util.DebugOr
   ghc-options:         -Werror
                        -Wall
+                       -fwarn-tabs
                        -threaded
                        -rtsopts
                        -with-rtsopts=-N
