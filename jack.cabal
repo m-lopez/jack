@@ -32,7 +32,12 @@ library
 executable jack-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -fwarn-missing-signatures -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -Werror
+                       -Wall
+                       -fwarn-tabs
+                       -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
   build-depends:       base
                      , jack
   default-language:    Haskell2010
@@ -47,7 +52,12 @@ test-suite jack-test
                        , jack
   other-modules:       BuiltIns Contexts EvaluationSpec Evaluator Expressions
                        Parser ParserSpec Typing TypingSpec Util.DebugOr
-  ghc-options:         -fwarn-missing-signatures -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -Werror
+                       -Wall
+                       -fwarn-tabs
+                       -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head
