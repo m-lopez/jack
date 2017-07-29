@@ -1,15 +1,31 @@
-module Contexts ( Ctx(Ctx), Binding(BVar), extendVars, extendVar ) where
+module Contexts (
+    Ctx(Ctx),
+    Binding(BVar),
+    extendVars,
+    extendVar,
+    Value(VExpr,VUnary,VBinary),
+    varValue, varName, varType
+  ) where
 
-import Expressions ( ExprName, QType )
+import Util.DebugOr ( DebugOr ) 
+import Expressions ( Expr, ExprName, QType )
 
-data Binding = BVar ExprName QType deriving (Show)
+data Value =
+    VExpr Expr
+  | VUnary (Expr -> DebugOr Expr)
+  | VBinary ((Expr, Expr) -> DebugOr Expr)
 
-newtype Ctx = Ctx [Binding] deriving (Show)
+data Binding = BVar {
+  varName  :: ExprName,
+  varType  :: QType,
+  varValue :: Maybe Value } -- todo: should there be another type of binding instead?
 
-extendVar :: ExprName -> QType -> Ctx -> Ctx
-extendVar x t (Ctx ctx) = Ctx $ BVar x t : ctx
+newtype Ctx = Ctx [Binding]
 
-extendVars :: [(ExprName, QType)] -> Ctx -> Ctx
+extendVar :: ExprName -> QType -> Value -> Ctx -> Ctx
+extendVar x t v (Ctx ctx) = Ctx $ BVar x t (Just v) : ctx
+
+extendVars :: [(ExprName, QType, Maybe Value)] -> Ctx -> Ctx
 extendVars xts (Ctx ctx) = Ctx (new_bindings ++ ctx)
   where
-    new_bindings = map (uncurry BVar) xts
+    new_bindings = map (\(x1, x2, x3) -> BVar x1 x2 x3) xts

@@ -123,10 +123,10 @@ resolve ctx p ps = case p of
 lookupVar :: AstName -> Ctx -> DebugOr OverloadSet
 lookupVar (AstName n) (Ctx bindings) =
   let
-    var_binding_has_name v b = case b of BVar v' _ -> v == v'
+    var_binding_has_name v b = case b of BVar v' _ _ -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
   in DebugOr $ Right $ OverloadSet $
-    map (\(BVar x t) -> (EVar x t, t)) overloads
+    map (\(BVar x t _) -> (EVar x t, t)) overloads
 
 -- Select from an overload on type.
 selectByType :: QType -> OverloadSet -> DebugOr (Expr, QType)
@@ -196,7 +196,7 @@ synthExpr ctx p = case p of
       vars      = map toExprName ps
     in do
       ts      <- checkUnquantTypes ctx pts
-      (e, t2) <- synthExpr (extendVars (zip vars $ map Unquantified ts) ctx) p'
+      (e, t2) <- synthExpr (extendVars (zip3 vars (map Unquantified ts) (repeat Nothing)) ctx) p'
       t2'     <- requireUnquantifiedType t2
       return (EAbs (zip vars ts) e, Unquantified $ CTArrow ts t2')
   AApp p1 p2 -> do
@@ -233,7 +233,7 @@ checkExpr ctx p ret_t = case p of
       (src_ts, tgt_t) <- requireArrowType ret_t
       src_ts'         <- checkUnquantTypes ctx nts
       requireTypeEqs src_ts src_ts'
-      (e, tgt_t')     <- checkExpr (extendVars (zip vars $ map Unquantified src_ts') ctx) p' (Unquantified tgt_t)
+      (e, tgt_t')     <- checkExpr (extendVars (zip3 vars (map Unquantified src_ts') (repeat Nothing)) ctx) p' (Unquantified tgt_t)
       requireOrElse (areStructurallyEqualQType tgt_t' (Unquantified tgt_t)) "type mismatch: unimplemented"
       return (EAbs (zip vars src_ts) e, ret_t)
   AApp p1 p2 -> do

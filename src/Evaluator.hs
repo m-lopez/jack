@@ -4,11 +4,14 @@ module Evaluator ( evalExpr ) where
 
 import Expressions (
   Expr(..),
-  ExprName,
+  ExprName(ExprName),
   substExprs,
-  CType(..), QType(..) )
-import Util.DebugOr ( DebugOr, requireOrElse )
-import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
+  CType(..),
+  QType(..),
+  areStructurallyEqualQType )
+import Contexts ( Ctx(Ctx), Binding(BVar), Value(VUnary, VBinary) )
+import Util.DebugOr ( DebugOr, requireOrElse, mkSuccess )
+import Data.List ( find )
 
 
 
@@ -24,8 +27,8 @@ import BuiltIns ( lookupUnaryBuiltin, lookupBinaryBuiltin )
 --  if false then e1 else e2 ~> e2
 
 -- We allow Maybe to catch compiler errors that lead to an unsound type system.
-evalExpr :: Expr -> DebugOr Expr
-evalExpr e = case e of
+evalExpr :: Ctx -> Expr -> DebugOr Expr
+evalExpr ctx e = case e of
   ELitBool _ ->
     return e
   ELitInt _ ->
@@ -34,46 +37,74 @@ evalExpr e = case e of
     return e
   EAbs _ _ ->
     return e
-  EApp e' es -> evalApp e' es
+  EApp e' es -> evalApp ctx e' es
   EIf c e1 e2 -> do
-    res <- evalExpr c
+    res <- evalExpr ctx c
     b   <- asBool res
-    if b then evalExpr e1 else evalExpr e2
+    if b then evalExpr ctx e1 else evalExpr ctx e2
 
-evalApp :: Expr -> [Expr] -> DebugOr Expr
-evalApp e es = do
-    vs <- evalExprs es
-    f  <- evalExpr e
+evalApp :: Ctx -> Expr -> [Expr] -> DebugOr Expr
+evalApp ctx e es = do
+    vs <- evalExprs ctx es
+    f  <- evalExpr ctx e
     case f of
-      EAbs xs e' -> evalLambdaApp e' xs vs
-      EVar x t   -> evalBuiltin x t vs
+      EAbs xs e' -> evalLambdaApp ctx e' xs vs
+      EVar x t   -> evalBuiltin ctx x t vs
       _           -> fail "callee is not callable"
 
-evalLambdaApp :: Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
-evalLambdaApp e xs vs = do
+evalLambdaApp :: Ctx -> Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
+evalLambdaApp ctx e xs vs = do
   requireOrElse (length vs == length xs) "arity doesn't match number of arguments"
   let xts = map (\(x,t) -> (x, Unquantified t)) xs
   let subst = zip xts vs
-  evalExpr $ substExprs subst e
+  evalExpr ctx $ substExprs subst e
 
-evalBuiltin :: ExprName -> QType -> [Expr] -> DebugOr Expr
-evalBuiltin x t vs = case vs of
-  [v]     -> evalUnaryBuiltin x t v
-  [v1,v2] -> evalBinaryBuiltin x t (v1, v2)
+evalBuiltin :: Ctx -> ExprName -> QType -> [Expr] -> DebugOr Expr
+evalBuiltin ctx x t vs = case vs of
+  [v]     -> evalUnaryBuiltin ctx x t v
+  [v1,v2] -> evalBinaryBuiltin ctx x t (v1, v2)
   _       -> fail ("no built-ins with arity " ++ (show $ length vs))
 
-evalUnaryBuiltin :: ExprName -> QType -> Expr -> DebugOr Expr
-evalUnaryBuiltin x t v = do
-    op <- lookupUnaryBuiltin x t
-    op v
+justOrErr :: Maybe a -> String -> DebugOr a
+justOrErr a msg = case a of
+  Just a' -> mkSuccess a'
+  Nothing -> fail msg
 
-evalBinaryBuiltin :: ExprName -> QType -> (Expr, Expr) -> DebugOr Expr
-evalBinaryBuiltin x t vs = do
-    op <- lookupBinaryBuiltin x t
-    op vs
+lookupBVarBySig :: Ctx -> ExprName -> QType -> DebugOr Binding
+lookupBVarBySig (Ctx bindings) x t = justOrErr binding_maybe err_msg
+  where
+    has_sig y u (BVar y' u' _) = y == y' && areStructurallyEqualQType u u'
+    binding_maybe = find (has_sig x t) bindings
+    err_msg = "cannot find binding with signature `" ++ show x ++ ": " ++ show t ++ "`"
 
-evalExprs :: [Expr] -> DebugOr [Expr]
-evalExprs = traverse evalExpr
+lookupUnaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr (Expr -> DebugOr Expr)
+lookupUnaryBuiltin ctx x t = do
+  b <- lookupBVarBySig ctx x t
+  getUnaryOp b
+  where
+    getUnaryOp (BVar _ _ (Just (VUnary op))) = mkSuccess op
+    getUnaryOp _ = fail ("`" ++ show x ++ "` does not define a built-in unary")
+
+lookupBinaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
+lookupBinaryBuiltin ctx x t = do
+  b <- lookupBVarBySig ctx x t
+  getBinaryOp b
+  where
+    getBinaryOp (BVar _ _ (Just (VBinary op))) = mkSuccess op
+    getBinaryOp _ = fail ("`" ++ show x ++ "` does not define a built-in unary")
+
+evalUnaryBuiltin :: Ctx -> ExprName -> QType -> Expr -> DebugOr Expr
+evalUnaryBuiltin ctx x t v = do
+  op <- lookupUnaryBuiltin ctx x t
+  op v
+
+evalBinaryBuiltin :: Ctx -> ExprName -> QType -> (Expr, Expr) -> DebugOr Expr
+evalBinaryBuiltin ctx x t vs = do
+  op <- lookupBinaryBuiltin ctx x t
+  op vs
+
+evalExprs :: Ctx -> [Expr] -> DebugOr [Expr]
+evalExprs ctx = traverse (evalExpr ctx)
 
 asBool :: Expr -> DebugOr Bool
 asBool e = case e of

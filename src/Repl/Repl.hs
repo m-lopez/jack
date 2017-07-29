@@ -10,7 +10,6 @@ import BuiltIns ( builtinsCtx )
 
 import Data.Char ( isSpace )
 import Data.Maybe ( fromMaybe )
-import Control.Monad.Loops ( whileJust_ )
 import Data.List ( dropWhile, dropWhileEnd, stripPrefix )
 
 import System.IO ( IO, putStr, putStrLn, hFlush, stdout )
@@ -49,12 +48,8 @@ typeSynth s = do
 dropWhiteSpace :: String -> String
 dropWhiteSpace s = dropWhileEnd isSpace $ dropWhile isSpace s
 
-data Store = Store
-
 -- | Compiler state.
-data CompilerState = CompilerState {
-  getCtx   :: Ctx,
-  getStore :: Store }
+newtype CompilerState = CompilerState { getCtx :: Ctx }
 
 -- | Prints all of the commands.
 helpCmd :: String -> String
@@ -123,14 +118,13 @@ execCmd cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd cmd)
 
 -- | Applies Toaster's evaluation rules to compute a value.
 evalCode :: CompilerState -> String -> (CompilerState, String)
-evalCode state input = (state, showUnderlying v)
+evalCode state input = (state, showUnderlying v')
   where
-    v = do
+    v' = do
       ast <- simpleParse input
       (e, t) <- synthExpr (getCtx state) ast
-      v <- evalExpr e
+      v <- evalExpr (getCtx state) e
       return $ show v ++ " : " ++ show t
-    pair x y = (x,y)
 
 -- | Evaluates the input and prints the state.
 evalThenPrint2 :: (CompilerState, String) -> (CompilerState, String)
@@ -155,20 +149,21 @@ header = "> "
 
 -- | The main loop of the repl.
 loop :: CompilerState -> String -> IO ()
-loop state input = if isQuitCmd input
-  then putGoodbye
-  else do
-    putStrLn result       -- Print
-    cmd <- prompt header  -- Read
-    loop  state cmd       -- Eval/Loop
-  where (state, result) = evalThenPrint2 (state, input)
+loop state input = let (state', result) = evalThenPrint2 (state, input) in
+  if isQuitCmd input
+    then putGoodbye
+    else do
+      putStrLn result       -- Print
+      cmd <- prompt header  -- Read
+      loop state' cmd       -- Eval/Loop
 
+-- | The initial compiler state.
 initCompilerState :: CompilerState
-initCompilerState = CompilerState builtinsCtx Store
+initCompilerState = CompilerState builtinsCtx
 
 -- | An entry point into the default Toaster repl.
 repl :: IO ()
 repl = do
   putStrLn welcomeText
-  cmd <- prompt "new >" -- header
+  cmd <- prompt header
   loop initCompilerState cmd
