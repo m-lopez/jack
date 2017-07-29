@@ -2,7 +2,6 @@ module ParserSpec ( parserSpec ) where
 
 import Test.HUnit ( assertEqual, Test(TestCase, TestList, TestLabel) )
 import Parser ( simpleParse, Ast(..), AstName (..) )
-import Text.Parsec ( parse )
 import Util.DebugOr ( debugRep )
 
 
@@ -118,4 +117,6 @@ parserSpec :: Test
 parserSpec = TestLabel "Parsing tests" $ TestList [
   TestLabel "simple expressions" $            mkSyntaxTests simpleExprTests,
   TestLabel "binary operation syntax tests" $ mkSyntaxTests binOpTests,
+  TestLabel "lambda syntax tests" $           mkSyntaxTests lambdaTests,
+  TestLabel "conditional syntax tests" $      mkSyntaxTests conditionalTests,
   TestLabel "application syntax tests" $      mkSyntaxTests appTests ]

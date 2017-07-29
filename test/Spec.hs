@@ -1,11 +1,12 @@
-import Test.HUnit( Test(TestList, TestLabel), runTestTT )
+import Test.HUnit( runTestTT )
 import ParserSpec ( parserSpec )
 import TypingSpec ( typingSpec )
 import EvaluationSpec ( evalSpec )
 
+-- | Run all of the unit tests.
 main :: IO ()
 main = do
-  runTestTT parserSpec
-  runTestTT typingSpec
-  runTestTT evalSpec
+  _ <- runTestTT parserSpec
+  _ <- runTestTT typingSpec
+  _ <- runTestTT evalSpec
   return ()

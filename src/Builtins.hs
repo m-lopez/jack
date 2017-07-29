@@ -12,7 +12,7 @@ import Expressions (
   Expr(..),
   areStructurallyEqualQType )
 import Contexts ( Ctx(Ctx), extendVars )
-import Util.DebugOr ( DebugOr( DebugOr ), mkSuccess, fromMaybe )
+import Util.DebugOr ( DebugOr, mkSuccess, fromMaybe )
 
 import Data.List ( find )
 
@@ -36,7 +36,7 @@ instance AsUnaryIntrinsicData (Integer -> Integer) where
   asUnaryIntrinsic x f = UnaryIntrinsicData (ExprName x) t un_op
     where
       t = Unquantified $ CTArrow [ CTInt ] CTInt
-      un_op x = case x of
+      un_op x' = case x' of
         ELitInt y -> mkSuccess $ ELitInt $ f y
         _ -> fail "expected an integer value; found something else"
 
@@ -45,7 +45,7 @@ instance AsUnaryIntrinsicData (Bool -> Bool) where
   asUnaryIntrinsic x f = UnaryIntrinsicData (ExprName x) t un_op
     where
       t = Unquantified $ CTArrow [ CTBool ] CTBool
-      un_op = \x -> case x of
+      un_op x' = case x' of
         ELitBool y -> mkSuccess $ ELitBool $ f y
         _ -> fail "expected an integer value; found something else"
 
@@ -58,7 +58,7 @@ unaryBuiltins = [
 lookupUnaryBuiltin :: ExprName -> QType -> DebugOr (Expr -> DebugOr Expr)
 lookupUnaryBuiltin x t = fromMaybe maybe_op err_msg
   where
-    has_sig x t (UnaryIntrinsicData y u _) = x == y && areStructurallyEqualQType t u
+    has_sig x' t' (UnaryIntrinsicData y u _) = x' == y && areStructurallyEqualQType t' u
     err_msg = "cannot find unary built-in `" ++ show x ++ "`"
     maybe_op = getUnOpCode <$> find (has_sig x t) unaryBuiltins
 
@@ -80,8 +80,8 @@ instance AsBinaryIntrinsicData (Integer -> Integer -> Integer) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
       t = Unquantified $ CTArrow [ CTInt, CTInt ] CTInt
-      bin_op (x,y) = case (x,y) of
-        (ELitInt x, ELitInt y) -> mkSuccess $ ELitInt $ f x y
+      bin_op (x'',y) = case (x'',y) of
+        (ELitInt x', ELitInt y') -> mkSuccess $ ELitInt $ f x' y'
         _ -> fail "expected an integer value; found something else"
 
 -- Binary Boolean operations
@@ -89,8 +89,8 @@ instance AsBinaryIntrinsicData (Bool -> Bool -> Bool) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
       t = Unquantified $ CTArrow [ CTBool, CTBool ] CTBool
-      bin_op (x,y) = case (x,y) of
-        (ELitBool x, ELitBool y) -> mkSuccess $ ELitBool $ f x y
+      bin_op (x'',y) = case (x'',y) of
+        (ELitBool x', ELitBool y') -> mkSuccess $ ELitBool $ f x' y'
         _ -> fail "expected an integer value; found something else"
 
 -- Binary integer predicate.
@@ -98,8 +98,8 @@ instance AsBinaryIntrinsicData (Integer -> Integer -> Bool) where
   asBinaryIntrinsic x f = BinaryIntrinsicData (ExprName x) t bin_op
     where
       t = Unquantified $ CTArrow [ CTInt, CTInt ] CTBool
-      bin_op (x,y) = case (x,y) of
-        (ELitInt x, ELitInt y) -> mkSuccess $ ELitBool $ f x y
+      bin_op (x'',y) = case (x'',y) of
+        (ELitInt x', ELitInt y') -> mkSuccess $ ELitBool $ f x' y'
         _ -> fail "expected an integer value; found something else"
 
 -- Need to use coercions?
@@ -119,37 +119,41 @@ binaryBuiltins = [
   asBinaryIntrinsic ">"   ((>)  :: Integer -> Integer -> Bool),
   asBinaryIntrinsic ">="  ((>=) :: Integer -> Integer -> Bool) ]
 
+-- | Looks up the code for a built-in.
 lookupBinaryBuiltin :: ExprName -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
 lookupBinaryBuiltin x t = fromMaybe maybe_op err_msg
   where
-    has_sig x t (BinaryIntrinsicData y u _) = x == y && areStructurallyEqualQType t u
+    has_sig x' t' (BinaryIntrinsicData y u _) = x' == y && areStructurallyEqualQType t' u
     err_msg = "cannot find built-in `" ++ show x ++ "`"
     maybe_op = getBinOpCode <$> find (has_sig x t) binaryBuiltins
 
+-- | The set of unary operations.
 unaryOps :: [(ExprName, QType)]
 unaryOps = [
   (ExprName "-", Unquantified $ CTArrow [ CTInt ] CTInt),
   (ExprName "not", Unquantified $ CTArrow [ CTBool ] CTBool) ]
 
+-- | The set of binary operations.
+binaryOps :: [(ExprName, QType)]
+binaryOps = [
+  (ExprName "-",   Unquantified $ CTArrow [ CTInt ] CTInt),
+  (ExprName "not", Unquantified $ CTArrow [ CTBool ] CTBool),
+  (ExprName "+",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+  (ExprName "-",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+  (ExprName "*",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+  (ExprName "/",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+  (ExprName "rem", Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
+  (ExprName "or",  Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
+  (ExprName "and", Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
+  (ExprName "=",   Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
+  (ExprName "=",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+  (ExprName "<>",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+  (ExprName "<>",  Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
+  (ExprName "<",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+  (ExprName "<=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+  (ExprName ">",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
+  (ExprName ">=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool) ]
+
 -- | A set of binary operations and their types.
 builtinsCtx :: Ctx
-builtinsCtx = extendVars ops $ Ctx []
-  where
-    ops = [
-      (ExprName "-",   Unquantified $ CTArrow [ CTInt ] CTInt),
-      (ExprName "not", Unquantified $ CTArrow [ CTBool ] CTBool),
-      (ExprName "+",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
-      (ExprName "-",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
-      (ExprName "*",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
-      (ExprName "/",   Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
-      (ExprName "rem", Unquantified $ CTArrow [ CTInt, CTInt ] CTInt),
-      (ExprName "or",  Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
-      (ExprName "and", Unquantified $ CTArrow [ CTBool, CTBool ] CTInt),
-      (ExprName "=",   Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
-      (ExprName "=",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
-      (ExprName "<>",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
-      (ExprName "<>",  Unquantified $ CTArrow [ CTBool, CTBool ] CTBool),
-      (ExprName "<",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
-      (ExprName "<=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
-      (ExprName ">",   Unquantified $ CTArrow [ CTInt, CTInt ] CTBool),
-      (ExprName ">=",  Unquantified $ CTArrow [ CTInt, CTInt ] CTBool) ]
+builtinsCtx = extendVars unaryOps $ extendVars binaryOps $ Ctx []
