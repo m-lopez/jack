@@ -12,7 +12,7 @@ import Data.Functor.Identity
 
 import Text.Parsec (many, try, parse)
 import Text.Parsec.Char (oneOf, string, digit, char, letter)
-import Text.Parsec.Combinator (many1, sepBy, sepBy1)
+import Text.Parsec.Combinator (many1, sepBy)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr ( buildExpressionParser
                         , Operator(Prefix, Infix)
@@ -212,7 +212,7 @@ intLit = read <$> many1 digit
 literal :: Parser Ast
 literal = asLexeme $ int <|> bool
   where
-    int  = ALitInt . read <$> many1 digit
+    int  = ALitInt <$> intLit
     bool = ALitBool <$> boolLit
 
 

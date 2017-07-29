@@ -1,4 +1,4 @@
-module Contexts ( Ctx(Ctx), Binding(BVar), extendVars ) where
+module Contexts ( Ctx(Ctx), Binding(BVar), extendVars, extendVar ) where
 
 import Expressions ( ExprName, QType )
 

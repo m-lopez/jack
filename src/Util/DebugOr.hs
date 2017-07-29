@@ -20,8 +20,7 @@ module Util.DebugOr (
   showUnderlying
 ) where
 
-import Data.Either ( lefts, rights )
-import Data.List ( intercalate )
+import Data.Either ( rights )
 
 
 

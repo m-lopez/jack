@@ -13,8 +13,6 @@ module Expressions( Expr(..)
                   , areStructurallyEqualQType
                   ) where
 
-import Parser (Ast(..), AstName(AstName))
-
 
 
 --------------------------------------------------------------------------------
@@ -115,12 +113,12 @@ areStructurallyEqualCType t1 t2 = case (t1,t2) of
 -- Note: This does not compute alpha equivalence.
 areStructurallyEqualExpr :: Expr -> Expr -> Bool
 areStructurallyEqualExpr x y = let
-    are_bindings_eq (ExprName x, t) (ExprName x', t') = x == x' && areStructurallyEqualCType t t'
+    are_bindings_eq (ExprName z, t) (ExprName z', t') = z == z' && areStructurallyEqualCType t t'
     are_list_bindings_eq bs bs' = (length bs == length bs') && all (uncurry are_bindings_eq) (zip bs bs')
   in case (x,y) of
     (ELitBool b, ELitBool b') -> b == b'
     (ELitInt n, ELitInt n') -> n == n'
-    (EVar x t, EVar x' t') -> x == x' && areStructurallyEqualQType t t'
+    (EVar z t, EVar z' t') -> z == z' && areStructurallyEqualQType t t'
     (EAbs bs e, EAbs bs' e') ->
       are_list_bindings_eq bs bs' && areStructurallyEqualExpr e e'
     (EApp e es, EApp e' es') ->
@@ -130,3 +128,4 @@ areStructurallyEqualExpr x y = let
       areStructurallyEqualExpr e1 e1' &&
         areStructurallyEqualExpr e2 e2' &&
           areStructurallyEqualExpr e3 e3'
+    _ -> False

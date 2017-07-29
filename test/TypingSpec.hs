@@ -14,8 +14,6 @@ import BuiltIns ( builtinsCtx )
 import Contexts ( Ctx(..), Binding(..) )
 import Util.DebugOr ( DebugOr(..) )
 
-import Text.Parsec ( parse )
-
 
 
 ------ Helper functions --------------------------------------------------------
@@ -48,9 +46,9 @@ mkPassingTypeCheckTest :: CheckTest -> Test
 mkPassingTypeCheckTest x = TestCase (assertBool name cond)
   where
     name = show ctx ++ " |- " ++ show p ++ ": " ++ show t ++ " => " ++ show e
-    cond = applyRelation areStructurallyEqualExpr res exp
+    cond = applyRelation areStructurallyEqualExpr res expd
     res  = DebugOr $ Right e
-    exp  = fst <$> checkExpr ctx p t
+    expd = fst <$> checkExpr ctx p t
     ctx  = ctGetCtx x
     p    = ctGetCode x
     t    = ctGetType x

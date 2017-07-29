@@ -5,7 +5,6 @@ module Evaluator ( evalExpr ) where
 import Expressions (
   Expr(..),
   ExprName,
-  substExpr,
   substExprs,
   CType(..), QType(..) )
 import Util.DebugOr ( DebugOr, requireOrElse )
@@ -35,7 +34,7 @@ evalExpr e = case e of
     return e
   EAbs _ _ ->
     return e
-  EApp e es -> evalApp e es
+  EApp e' es -> evalApp e' es
   EIf c e1 e2 -> do
     res <- evalExpr c
     b   <- asBool res
@@ -75,11 +74,6 @@ evalBinaryBuiltin x t vs = do
 
 evalExprs :: [Expr] -> DebugOr [Expr]
 evalExprs = traverse evalExpr
-
-asLambda :: Expr -> DebugOr ([(ExprName, CType)], Expr)
-asLambda e = case e of
-  EAbs params e' -> return (params, e')
-  _               -> fail "callee is not callable"
 
 asBool :: Expr -> DebugOr Bool
 asBool e = case e of
