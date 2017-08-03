@@ -17,8 +17,10 @@ module Util.DebugOr (
   mkSuccess,
   fromMaybe,
   fail,
-  showUnderlying
-) where
+  showUnderlying,
+  isSuccess,
+  justOrErr,
+  fromDebug ) where
 
 import Data.Either ( rights )
 
@@ -82,3 +84,20 @@ showUnderlying :: Show a => DebugOr a -> String
 showUnderlying d = case debugRep d of
   Left x  -> x
   Right x -> show x
+
+-- | True iff the debug value is a success.
+isSuccess :: DebugOr a -> Bool
+isSuccess (DebugOr x) = case x of
+  Left _  -> False
+  Right _ -> True
+
+justOrErr :: Maybe a -> String -> DebugOr a
+justOrErr a msg = case a of
+  Just a' -> mkSuccess a'
+  Nothing -> fail msg
+
+-- | Map over each of the cases inot a common type.
+fromDebug :: DebugOr a -> (a -> b) -> (String -> b) -> b
+fromDebug (DebugOr x) f g = case x of
+  Left s  -> g s
+  Right y -> f y

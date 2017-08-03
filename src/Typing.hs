@@ -1,6 +1,8 @@
-module Typing ( synthExpr
-              , checkExpr
-              , checkType) where
+module Typing (
+  synthExpr,
+  checkExpr,
+  checkType,
+  checkTopLevel ) where
 
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
@@ -10,16 +12,17 @@ import Util.DebugOr (
   DebugOr(DebugOr),
   onlySuccessful,
   requireOrElse,
-  mkSuccess )
-import Expressions ( Expr(..)
-                   , CType(..)
-                   , QType(..)
-                   , ExprName(..)
-                   , TypeName(..)
-                   , areStructurallyEqualCType
-                   , areStructurallyEqualQType
-                   )
-import Contexts ( Ctx(..), Binding(BVar), extendVars )
+  mkSuccess,
+  isSuccess )
+import Expressions (
+  Expr(..),
+  CType(..),
+  QType(..),
+  ExprName(..),
+  TypeName(..),
+  areStructurallyEqualCType,
+  areStructurallyEqualQType )
+import Contexts ( Ctx(..), Binding(BVar), extendVars, lookupSignature )
 
 
 --------------------------------------------------------------------------------
@@ -47,7 +50,7 @@ summerizeForm ast = case ast of
   AAbs _ _    -> "\\(x:t,...) -> e"
   AApp _ _    -> "e e"
   AIf _ _ _   -> "if b then e else e"
-  ADef _ _    -> "def x:t := e"
+  ADef _ _ _  -> "def x:t := e"
   _           -> "unrecognized AST"
 
 
@@ -163,7 +166,7 @@ checkUnquantType ctx p = case p of
   AIf _ _ _ -> fail_here
   ACoerce _ _ -> fail_here
   AInit _ -> fail_here
-  ADef _ _ -> fail_here
+  ADef _ _ _ -> fail_here
   where fail_here = fail $ "expected unquantified type; got " ++ summerizeForm p
 
 checkUnquantTypes :: Ctx -> [Ast] -> DebugOr [CType]
@@ -248,3 +251,21 @@ checkExpr ctx p ret_t = case p of
 
 checkExprs :: Ctx -> [(Ast, QType)] -> DebugOr [(Expr, QType)]
 checkExprs ctx = traverse (uncurry $ checkExpr ctx)
+
+-- | Requires that `x:t` is not defined.
+requireNotDefined :: Ctx -> ExprName -> QType -> DebugOr ()
+requireNotDefined ctx x t = let
+    b = lookupSignature ctx x t
+  in case b of
+    DebugOr (Right (BVar _ _ (Just _))) -> fail $ "attempting to redefine " ++ show (x,t)
+    _ -> mkSuccess ()
+
+-- | FIXME: Ad-hoc. No thought went into this.
+checkTopLevel :: Ctx -> Ast -> DebugOr (ExprName, QType, Expr)
+checkTopLevel ctx (ADef x_p t_p e_p) = do
+  t <- checkType ctx t_p
+  let x = toExprName x_p
+  _ <- requireNotDefined ctx x t
+  (e, _) <- checkExpr ctx e_p t
+  return (x, t, e)
+checkTopLevel _ p = fail $ "expected a definition; got " ++ show p

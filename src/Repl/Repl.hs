@@ -1,14 +1,23 @@
 module Repl.Repl ( repl ) where
 
-import Parser ( simpleParse )
-import Expressions ( QType(..), Expr )
-import Contexts ( Ctx(..) )
-import Typing ( synthExpr )
-import Util.DebugOr ( DebugOr(..), showUnderlying )
+import Parser ( Ast(..), replParse )
+import Expressions ( QType(..), Expr, ExprName(ExprName) )
+import Contexts (
+  Ctx(..),
+  Binding(..),
+  extendVar,
+  lookupSignature,
+  Value(VExpr) )
+import Typing ( synthExpr, checkTopLevel )
+import Util.DebugOr (
+  DebugOr(..),
+  showUnderlying,
+  mkSuccess,
+  isSuccess,
+  fromDebug )
 import Evaluator ( evalExpr )
 import BuiltIns ( builtinsCtx )
-
-import Data.Char ( isSpace )
+import Data.Char ( isSpace, isAlphaNum )
 import Data.Maybe ( fromMaybe )
 import Data.List ( dropWhile, dropWhileEnd, stripPrefix )
 
@@ -33,14 +42,14 @@ prompt s = flushStr s >> getLine
 
 -- | Prints a parse tree.
 parseTree :: String -> String
-parseTree s = showUnderlying $ simpleParse s
+parseTree s = showUnderlying $ replParse s
 
 -- | Prints the type of an expression.
 -- FIXME: We have demonstrated the need to print expressions in a debug and
 --        source code mode.
 typeSynth :: String -> DebugOr (Expr, QType)
 typeSynth s = do
-  ast <- simpleParse s
+  ast <- replParse s
   (e, t) <- synthExpr builtinsCtx ast
   return (e, t)
 
@@ -116,15 +125,44 @@ matchCmd cmd = matchCmdRec cmd commands
 execCmd :: String -> String
 execCmd cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd cmd)
 
--- | Applies Toaster's evaluation rules to compute a value.
-evalCode :: CompilerState -> String -> (CompilerState, String)
-evalCode state input = (state, showUnderlying v')
+-- | Prints a definition.
+showDef :: (ExprName, QType, Expr) -> String
+showDef (ExprName s, t, e) =
+  "defined " ++ show s ++ ": " ++ show t ++ " := " ++ show e
+
+-- | Attempt to evaluate a top-level definition.
+evalDefinition :: CompilerState -> Ast -> DebugOr (CompilerState, String)
+evalDefinition state ast@(ADef _ _ _) = do
+  (x, t, e) <- checkTopLevel ctx ast
+  v <- evalExpr ctx e
+  return (CompilerState $ extendVar x t (VExpr v) ctx, showDef x t v)
+  where
+    ctx = getCtx state
+    showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v
+
+-- | Evaluates a top-level expression.
+evalExpression :: CompilerState -> Ast -> String
+evalExpression state ast = showUnderlying v'
   where
     v' = do
-      ast <- simpleParse input
       (e, t) <- synthExpr (getCtx state) ast
       v <- evalExpr (getCtx state) e
       return $ show v ++ " : " ++ show t
+
+-- | Attempt to apply Toaster's evaluation rules to compute a value.
+tryEvalCode :: CompilerState -> String -> DebugOr (CompilerState, String)
+tryEvalCode state source = do
+  ast <- replParse source
+  case ast of
+    ADef _ _ _ -> evalDefinition state ast
+    _          -> return (state, evalExpression state ast)
+
+-- | Apply Toaster's evaluation rules to compute a value or print any
+-- encountered error and leave the context as it is.
+evalCode :: CompilerState -> String -> (CompilerState, String)
+evalCode state code = fromDebug attempt id (\x -> (state, x))
+  where
+    attempt = tryEvalCode state code
 
 -- | Evaluates the input and prints the state.
 evalThenPrint2 :: (CompilerState, String) -> (CompilerState, String)

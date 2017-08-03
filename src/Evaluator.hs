@@ -9,7 +9,11 @@ import Expressions (
   CType(..),
   QType(..),
   areStructurallyEqualQType )
-import Contexts ( Ctx(Ctx), Binding(BVar), Value(VUnary, VBinary) )
+import Contexts (
+  Ctx(Ctx),
+  Binding(BVar),
+  Value(VUnary, VBinary),
+  lookupSignature )
 import Util.DebugOr ( DebugOr, requireOrElse, mkSuccess )
 import Data.List ( find )
 
@@ -65,21 +69,9 @@ evalBuiltin ctx x t vs = case vs of
   [v1,v2] -> evalBinaryBuiltin ctx x t (v1, v2)
   _       -> fail ("no built-ins with arity " ++ (show $ length vs))
 
-justOrErr :: Maybe a -> String -> DebugOr a
-justOrErr a msg = case a of
-  Just a' -> mkSuccess a'
-  Nothing -> fail msg
-
-lookupBVarBySig :: Ctx -> ExprName -> QType -> DebugOr Binding
-lookupBVarBySig (Ctx bindings) x t = justOrErr binding_maybe err_msg
-  where
-    has_sig y u (BVar y' u' _) = y == y' && areStructurallyEqualQType u u'
-    binding_maybe = find (has_sig x t) bindings
-    err_msg = "cannot find binding with signature `" ++ show x ++ ": " ++ show t ++ "`"
-
 lookupUnaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr (Expr -> DebugOr Expr)
 lookupUnaryBuiltin ctx x t = do
-  b <- lookupBVarBySig ctx x t
+  b <- lookupSignature ctx x t
   getUnaryOp b
   where
     getUnaryOp (BVar _ _ (Just (VUnary op))) = mkSuccess op
@@ -87,7 +79,7 @@ lookupUnaryBuiltin ctx x t = do
 
 lookupBinaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
 lookupBinaryBuiltin ctx x t = do
-  b <- lookupBVarBySig ctx x t
+  b <- lookupSignature ctx x t
   getBinaryOp b
   where
     getBinaryOp (BVar _ _ (Just (VBinary op))) = mkSuccess op
