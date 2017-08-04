@@ -1,56 +1,58 @@
 -- This module defines the expression languages and fundamental expression
 -- algorithms.
 
-module Expressions( Expr(..)
-                  , QType(..)
-                  , CType(..)
-                  , ExprName(..)
-                  , TypeName(..)
-                  , substExpr
-                  , substExprs
-                  , areStructurallyEqualExpr
-                  , areStructurallyEqualCType
-                  , areStructurallyEqualQType
-                  ) where
+module Expressions(
+  Expr(..),
+  QType(..),
+  CType(..),
+  ExprName(..),
+  TypeName(..),
+  substExpr,
+  substExprs,
+  areStructurallyEqualExpr,
+  areStructurallyEqualCType,
+  areStructurallyEqualQType ) where
 
+import Util.DebugOr ( DebugOr )
+import Data.List ( intercalate )
 
-
---------------------------------------------------------------------------------
---  Symbol names for Expressions and types.
-
+-- | Symbols.
 newtype ExprName = ExprName String deriving (Show, Eq)
 newtype TypeName = TypeName String deriving (Show, Eq)
 
-
-
--------------------------------------
--- Expression syntax
---
-
+-- | Expression syntax for type checking.
 data Expr =
-    ELitBool Bool
-  | ELitInt  Integer
-  | EVar      ExprName QType
-  | EAbs      [(ExprName, CType)] Expr
-  | EApp      Expr [Expr]
-  | EIf       Expr Expr Expr
-  deriving (Show)
+    ELitBool    Bool
+  | ELitInt     Integer
+  | EVar        ExprName QType
+  | EAbs        [(ExprName, CType)] Expr
+  | EApp        Expr [Expr]
+  | EIf         Expr Expr Expr
+  | EUnBuiltin  (Expr -> DebugOr Expr)
+  | EBinBuiltin ((Expr, Expr) -> DebugOr Expr)
 
--------------------------------------
--- Proposition syntax
---
+-- | A printer instance for expressions.
+instance Show Expr where
+  show e = case e of
+    ELitBool b -> show b
+    ELitInt n -> show n
+    EVar (ExprName x) t -> x ++ "_{" ++ show t ++ "}"
+    EAbs bs e1 -> "\\(" ++ intercalate ", " (map show bs) ++ ") -> " ++ show e1
+    EApp e1 es -> "(" ++ show e1 ++ ")" ++ "(" ++ intercalate ", " (map show es) ++ ")"
+    EIf e1 e2 e3 -> "if " ++ show e1 ++ " then " ++ " else " ++ show e3
+    EUnBuiltin _ -> "<built-in>"
+    EBinBuiltin _ -> "<built-in>"
 
+-- | Proposition syntax
 data Prop = PTrue deriving (Show)
 
--------------------------------------
--- Type syntax
---
-
+-- | Quantified type level syntax.
 data QType =
     Quantified   [TypeName] Prop CType
   | Unquantified CType
   deriving (Show)
 
+-- | Ground type syntax.
 data CType =
     CTBool
   | CTInt
@@ -58,9 +60,7 @@ data CType =
   | CTVar   TypeName
   deriving (Show)
 
---------------------------------------------------------------------------------
---  Substitution system.
-
+-- | Variable level substitution of variables.
 substExpr :: ExprName -> QType -> Expr -> Expr -> Expr
 substExpr x t v e =
   let

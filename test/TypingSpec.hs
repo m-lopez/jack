@@ -45,7 +45,7 @@ data CheckTest = CheckTest { ctGetCtx  :: Ctx
 mkPassingTypeCheckTest :: CheckTest -> Test
 mkPassingTypeCheckTest x = TestCase (assertBool name cond)
   where
-    name = show ctx ++ " |- " ++ show p ++ ": " ++ show t ++ " => " ++ show e
+    name = " |- " ++ show p ++ ": " ++ show t ++ " => " ++ show e
     cond = applyRelation areStructurallyEqualExpr res expd
     res  = DebugOr $ Right e
     expd = fst <$> checkExpr ctx p t
@@ -99,17 +99,17 @@ closedTests = [ ]
 simpleContextTests :: [CheckTest]
 simpleContextTests = [
   CheckTest
-    (Ctx [ BVar (ExprName "n") (Unquantified CTInt) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CTInt) Nothing ])
     (sym "n")
     (Unquantified CTInt)
     (var "n" $ Unquantified CTInt),
   CheckTest
-    (Ctx [ BVar (ExprName "n") (Unquantified CTInt), BVar (ExprName "m") (Unquantified CTInt) ])
+    (Ctx [ BVar (ExprName "n") (Unquantified CTInt) Nothing, BVar (ExprName "m") (Unquantified CTInt) Nothing ])
     (sym "n")
     (Unquantified CTInt)
     (var "n" $ Unquantified CTInt),
   CheckTest
-    (Ctx [ BVar (ExprName "m") (Unquantified CTInt), BVar (ExprName "n") (Unquantified CTInt) ])
+    (Ctx [ BVar (ExprName "m") (Unquantified CTInt) Nothing, BVar (ExprName "n") (Unquantified CTInt) Nothing ])
     (sym "n")
     (Unquantified CTInt)
     (var "n" $ Unquantified CTInt) ]
@@ -118,12 +118,12 @@ simpleContextTests = [
 overloadTests :: [CheckTest]
 overloadTests = [
   CheckTest
-    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt) Nothing, BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) Nothing ])
     (AApp (sym "f") [ ALitInt 2 ])
     (Unquantified CTInt)
     (EApp (var "f" $ Unquantified $ CTArrow [CTInt] CTInt) [ ELitInt 2 ]),
   CheckTest
-    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt), BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) ])
+    (Ctx [ BVar (ExprName "f") (Unquantified $ CTArrow [CTInt] CTInt) Nothing, BVar (ExprName "f") (Unquantified $ CTArrow [CTBool] CTBool) Nothing ])
     (AApp (sym "f") [ ALitBool True ])
     (Unquantified CTBool)
     (EApp (var "f" $ Unquantified $ CTArrow [CTBool] CTBool) [ ELitBool True ]) ]

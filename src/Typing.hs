@@ -1,6 +1,8 @@
-module Typing ( synthExpr
-              , checkExpr
-              , checkType) where
+module Typing (
+  synthExpr,
+  checkExpr,
+  checkType,
+  checkTopLevel ) where
 
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
@@ -10,16 +12,17 @@ import Util.DebugOr (
   DebugOr(DebugOr),
   onlySuccessful,
   requireOrElse,
-  mkSuccess )
-import Expressions ( Expr(..)
-                   , CType(..)
-                   , QType(..)
-                   , ExprName(..)
-                   , TypeName(..)
-                   , areStructurallyEqualCType
-                   , areStructurallyEqualQType
-                   )
-import Contexts ( Ctx(..), Binding(BVar), extendVars )
+  mkSuccess,
+  isSuccess )
+import Expressions (
+  Expr(..),
+  CType(..),
+  QType(..),
+  ExprName(..),
+  TypeName(..),
+  areStructurallyEqualCType,
+  areStructurallyEqualQType )
+import Contexts ( Ctx(..), Binding(BVar), extendVars, lookupSignature )
 
 
 --------------------------------------------------------------------------------
@@ -43,11 +46,11 @@ summerizeForm ast = case ast of
   ALitBool b -> show b
   ALitInt n  -> show n
   AArrow _ _  -> "_ -> _"
-  AName _     -> "x"
+  AName (AstName s) -> "`" ++ s ++ "`"
   AAbs _ _    -> "\\(x:t,...) -> e"
   AApp _ _    -> "e e"
   AIf _ _ _   -> "if b then e else e"
-  ADef _ _    -> "def x:t := e"
+  ADef _ _ _  -> "def x:t := e"
   _           -> "unrecognized AST"
 
 
@@ -123,10 +126,10 @@ resolve ctx p ps = case p of
 lookupVar :: AstName -> Ctx -> DebugOr OverloadSet
 lookupVar (AstName n) (Ctx bindings) =
   let
-    var_binding_has_name v b = case b of BVar v' _ -> v == v'
+    var_binding_has_name v b = case b of BVar v' _ _ -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
   in DebugOr $ Right $ OverloadSet $
-    map (\(BVar x t) -> (EVar x t, t)) overloads
+    map (\(BVar x t _) -> (EVar x t, t)) overloads
 
 -- Select from an overload on type.
 selectByType :: QType -> OverloadSet -> DebugOr (Expr, QType)
@@ -163,7 +166,7 @@ checkUnquantType ctx p = case p of
   AIf _ _ _ -> fail_here
   ACoerce _ _ -> fail_here
   AInit _ -> fail_here
-  ADef _ _ -> fail_here
+  ADef _ _ _ -> fail_here
   where fail_here = fail $ "expected unquantified type; got " ++ summerizeForm p
 
 checkUnquantTypes :: Ctx -> [Ast] -> DebugOr [CType]
@@ -196,7 +199,7 @@ synthExpr ctx p = case p of
       vars      = map toExprName ps
     in do
       ts      <- checkUnquantTypes ctx pts
-      (e, t2) <- synthExpr (extendVars (zip vars $ map Unquantified ts) ctx) p'
+      (e, t2) <- synthExpr (extendVars (zip3 vars (map Unquantified ts) (repeat Nothing)) ctx) p'
       t2'     <- requireUnquantifiedType t2
       return (EAbs (zip vars ts) e, Unquantified $ CTArrow ts t2')
   AApp p1 p2 -> do
@@ -233,7 +236,7 @@ checkExpr ctx p ret_t = case p of
       (src_ts, tgt_t) <- requireArrowType ret_t
       src_ts'         <- checkUnquantTypes ctx nts
       requireTypeEqs src_ts src_ts'
-      (e, tgt_t')     <- checkExpr (extendVars (zip vars $ map Unquantified src_ts') ctx) p' (Unquantified tgt_t)
+      (e, tgt_t')     <- checkExpr (extendVars (zip3 vars (map Unquantified src_ts') (repeat Nothing)) ctx) p' (Unquantified tgt_t)
       requireOrElse (areStructurallyEqualQType tgt_t' (Unquantified tgt_t)) "type mismatch: unimplemented"
       return (EAbs (zip vars src_ts) e, ret_t)
   AApp p1 p2 -> do
@@ -248,3 +251,21 @@ checkExpr ctx p ret_t = case p of
 
 checkExprs :: Ctx -> [(Ast, QType)] -> DebugOr [(Expr, QType)]
 checkExprs ctx = traverse (uncurry $ checkExpr ctx)
+
+-- | Requires that `x:t` is not defined.
+requireNotDefined :: Ctx -> ExprName -> QType -> DebugOr ()
+requireNotDefined ctx x t = let
+    b = lookupSignature ctx x t
+  in case b of
+    DebugOr (Right (BVar _ _ (Just _))) -> fail $ "attempting to redefine " ++ show (x,t)
+    _ -> mkSuccess ()
+
+-- | FIXME: Ad-hoc. No thought went into this.
+checkTopLevel :: Ctx -> Ast -> DebugOr (ExprName, QType, Expr)
+checkTopLevel ctx (ADef x_p t_p e_p) = do
+  t <- checkType ctx t_p
+  let x = toExprName x_p
+  _ <- requireNotDefined ctx x t
+  (e, _) <- checkExpr ctx e_p t
+  return (x, t, e)
+checkTopLevel _ p = fail $ "expected a definition; got " ++ show p

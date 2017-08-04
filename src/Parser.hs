@@ -1,22 +1,21 @@
-module Parser ( Ast (..)
-              , AstName (..)
-              , replParse
-              , simpleParse) where
+module Parser (
+  Ast(..),
+  AstName(..),
+  replParse
+  ) where
 
 import Util.DebugOr( DebugOr(..), fail, mkSuccess )
-
 import Control.Applicative ((<*), (*>), (<|>), (<$>))
 import Control.Monad (void)
-
 import Data.Functor.Identity
-
 import Text.Parsec (many, try, parse)
 import Text.Parsec.Char (oneOf, string, digit, char, letter)
 import Text.Parsec.Combinator (many1, sepBy)
 import Text.Parsec.String (Parser)
-import Text.Parsec.Expr ( buildExpressionParser
-                        , Operator(Prefix, Infix)
-                        , Assoc(AssocLeft))
+import Text.Parsec.Expr (
+  buildExpressionParser,
+  Operator(Prefix, Infix),
+  Assoc(AssocLeft))
 
 
 
@@ -27,6 +26,7 @@ import Text.Parsec.Expr ( buildExpressionParser
 
 newtype AstName  = AstName String  deriving (Show, Eq)
 
+-- | Abstract syntax trees for Toaster.
 data Ast =
     ATypeBool
   | ATypeInt
@@ -40,10 +40,8 @@ data Ast =
   | AIf       Ast Ast Ast
   | ACoerce   Ast Ast
   | AInit     [Ast]
-  | ADef      (AstName, Ast) Ast
+  | ADef      AstName Ast Ast
   deriving (Show, Eq)
-
-
 
 --------------------------------------------------------------------------------
 --  Reserved tokens and string manipulation.
@@ -51,7 +49,7 @@ data Ast =
 -- Reserved keywords.
 reservedKeywords :: [String]
 reservedKeywords = [ "if", "then", "else", "true", "false", "Bool", "Int",
-                      "def", "and", "or", "not", "rem" ]
+                     "def", "and", "or", "not", "rem" ]
 
 -- Reserved symbols.
 reservedSymbols :: [String]
@@ -220,9 +218,13 @@ literal = asLexeme $ int <|> bool
 --------------------------------------------------------------------------------
 --  Parse rules for types.
 
--- types ::= [arrowType; ","]
+-- | A parser for a type.
+typ :: Parser Ast
+typ = arrowType
+
+-- | a parser for a sequence of types separated by a comma.
 types :: Parser [Ast]
-types = sepBy arrowType (requireSymbol ",")
+types = sepBy typ (requireSymbol ",")
 
 -- literalType ::= Bool | Integer
 literalType :: Parser Ast
@@ -257,17 +259,22 @@ arrowType = try (AArrow <$> arrow_head <*> arrowType)
 --  Parse rules for definitions.
 
 def :: Parser Ast
-def = ADef <$> def_head <*> expr
+def = mkDef <$> def_head <*> expr
   where
-    def_head = requireKeyword "def" *> binding <* requireSymbol ":="
+    def_head = binding <* requireSymbol ":="
+    mkDef :: (AstName, Ast) -> Ast -> Ast
+    mkDef = uncurry ADef
 
 
 
 --------------------------------------------------------------------------------
 --  A REPL parser.
---  FIXME: Guard against EOF.
-replParse :: Parser Ast
-replParse = def <|> arrowType <|> expr
+replParse :: String -> DebugOr Ast
+replParse code = case parse rule "REPL parser" code of
+  Left x -> fail $ show x
+  Right x -> mkSuccess x
+  where
+    rule = try def <|> expr
 
 -- FIXME: This is not thought out.
 simpleParse :: String -> DebugOr Ast

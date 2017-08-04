@@ -9,6 +9,7 @@ import Expressions (
   areStructurallyEqualExpr )
 import Evaluator ( evalExpr )
 import Util.DebugOr ( DebugOr(debugRep), mkSuccess )
+import BuiltIns ( builtinsCtx )
 
 
 
@@ -31,7 +32,7 @@ mkPassingEvalTest :: EvalEqTest -> Test
 mkPassingEvalTest x = TestCase $ assertBool name cond
   where
     e    = getUneval x
-    v    = evalExpr e
+    v    = evalExpr builtinsCtx e
     expe = getExpectedValue x
     name = show e ++ " --> " ++ show expe
     cond = applyRelation areStructurallyEqualExpr (mkSuccess expe) v
