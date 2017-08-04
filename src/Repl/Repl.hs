@@ -6,8 +6,7 @@ import Contexts (
   Ctx(..),
   Binding(..),
   extendVar,
-  lookupSignature,
-  Value(VExpr) )
+  lookupSignature )
 import Typing ( synthExpr, checkTopLevel )
 import Util.DebugOr (
   DebugOr(..),
@@ -78,6 +77,12 @@ astCmd = parseTree
 tCmd :: String -> String
 tCmd arg = showUnderlying $ snd <$> typeSynth arg
 
+-- | Print the current bindings.
+-- bindingsCmd :: String -> String
+-- bindingsCmd arg = if arg == ""
+--   then showContext
+--   else "the command `bindings` does not take any arguments"
+
 -- | A mock command for exiting the terminal used for the description of
 -- commands.
 mockQuitCmd :: Command
@@ -107,10 +112,16 @@ data Command = Command {
 -- FIXME: Move this to another file.
 commands :: [Command]
 commands = [
-  Command "help" helpCmd ""    "Print the command list.",
-  Command "elab" elabCmd "<e>" "Prints the elaborated for of the expression `e`.",
-  Command "ast"  astCmd  "<e>" "Prints the parse tree of an expression `e`.",
-  Command "t"    tCmd    "<e>" "Prints the type of an expression `e`." ]
+  Command "ast" astCmd "<e>"
+    "Prints the parse tree of an expression `e`.",
+  Command "elab" elabCmd "<e>"
+    "Prints the elaborated for of the expression `e`.",
+  Command "help" helpCmd ""
+    "Print the command list.",
+  -- Command "bindigs" bindingsCmd ""
+  --   "Prints all bindings in the current context",
+  Command "t" tCmd "<e>"
+    "Prints the type of an expression `e`." ]
 
 -- | Matches the input command `cmd` with one of the commands.
 matchCmd :: String -> Maybe String
@@ -135,7 +146,7 @@ evalDefinition :: CompilerState -> Ast -> DebugOr (CompilerState, String)
 evalDefinition state ast@(ADef _ _ _) = do
   (x, t, e) <- checkTopLevel ctx ast
   v <- evalExpr ctx e
-  return (CompilerState $ extendVar x t (VExpr v) ctx, showDef x t v)
+  return (CompilerState $ extendVar x t v ctx, showDef x t v)
   where
     ctx = getCtx state
     showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v

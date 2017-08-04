@@ -46,7 +46,7 @@ summerizeForm ast = case ast of
   ALitBool b -> show b
   ALitInt n  -> show n
   AArrow _ _  -> "_ -> _"
-  AName _     -> "x"
+  AName (AstName s) -> "`" ++ s ++ "`"
   AAbs _ _    -> "\\(x:t,...) -> e"
   AApp _ _    -> "e e"
   AIf _ _ _   -> "if b then e else e"

@@ -12,7 +12,6 @@ import Expressions (
 import Contexts (
   Ctx(Ctx),
   Binding(BVar),
-  Value(VUnary, VBinary),
   lookupSignature )
 import Util.DebugOr ( DebugOr, requireOrElse, mkSuccess )
 import Data.List ( find )
@@ -37,8 +36,7 @@ evalExpr ctx e = case e of
     return e
   ELitInt _ ->
     return e
-  EVar _ _ ->
-    return e
+  EVar x t -> evalVar ctx x t
   EAbs _ _ ->
     return e
   EApp e' es -> evalApp ctx e' es
@@ -47,14 +45,25 @@ evalExpr ctx e = case e of
     b   <- asBool res
     if b then evalExpr ctx e1 else evalExpr ctx e2
 
+evalVar :: Ctx -> ExprName -> QType -> DebugOr Expr
+evalVar ctx x t = do
+  BVar _ _ v_maybe <- lookupSignature ctx x t
+  case v_maybe of
+    Just e  -> mkSuccess e
+    Nothing -> fail $ printed ++ " has no definition"
+  where
+    printed = "`" ++ show x ++ ": " ++ show t ++ "`"
+
 evalApp :: Ctx -> Expr -> [Expr] -> DebugOr Expr
 evalApp ctx e es = do
     vs <- evalExprs ctx es
+    -- FIXME: Add value check here.
     f  <- evalExpr ctx e
     case f of
-      EAbs xs e' -> evalLambdaApp ctx e' xs vs
-      EVar x t   -> evalBuiltin ctx x t vs
-      _           -> fail "callee is not callable"
+      EAbs xs e'    -> evalLambdaApp ctx e' xs vs
+      EUnBuiltin f  -> evalUnaryBuiltin f vs
+      EBinBuiltin f -> evalBinaryBuiltin f vs
+      _             -> fail $ "callee " ++ show f ++ " is not callable"
 
 evalLambdaApp :: Ctx -> Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
 evalLambdaApp ctx e xs vs = do
@@ -63,37 +72,15 @@ evalLambdaApp ctx e xs vs = do
   let subst = zip xts vs
   evalExpr ctx $ substExprs subst e
 
-evalBuiltin :: Ctx -> ExprName -> QType -> [Expr] -> DebugOr Expr
-evalBuiltin ctx x t vs = case vs of
-  [v]     -> evalUnaryBuiltin ctx x t v
-  [v1,v2] -> evalBinaryBuiltin ctx x t (v1, v2)
-  _       -> fail ("no built-ins with arity " ++ (show $ length vs))
+evalUnaryBuiltin :: (Expr -> DebugOr Expr) -> [Expr] -> DebugOr Expr
+evalUnaryBuiltin f vs = case vs of
+  [v] -> f v
+  _   -> fail $ "unary builtin expects 1 argument; got " ++ (show $ length vs)
 
-lookupUnaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr (Expr -> DebugOr Expr)
-lookupUnaryBuiltin ctx x t = do
-  b <- lookupSignature ctx x t
-  getUnaryOp b
-  where
-    getUnaryOp (BVar _ _ (Just (VUnary op))) = mkSuccess op
-    getUnaryOp _ = fail ("`" ++ show x ++ "` does not define a built-in unary")
-
-lookupBinaryBuiltin :: Ctx -> ExprName -> QType -> DebugOr ((Expr, Expr) -> DebugOr Expr)
-lookupBinaryBuiltin ctx x t = do
-  b <- lookupSignature ctx x t
-  getBinaryOp b
-  where
-    getBinaryOp (BVar _ _ (Just (VBinary op))) = mkSuccess op
-    getBinaryOp _ = fail ("`" ++ show x ++ "` does not define a built-in unary")
-
-evalUnaryBuiltin :: Ctx -> ExprName -> QType -> Expr -> DebugOr Expr
-evalUnaryBuiltin ctx x t v = do
-  op <- lookupUnaryBuiltin ctx x t
-  op v
-
-evalBinaryBuiltin :: Ctx -> ExprName -> QType -> (Expr, Expr) -> DebugOr Expr
-evalBinaryBuiltin ctx x t vs = do
-  op <- lookupBinaryBuiltin ctx x t
-  op vs
+evalBinaryBuiltin :: ((Expr, Expr) -> DebugOr Expr) -> [Expr] -> DebugOr Expr
+evalBinaryBuiltin f vs = case vs of
+  [v1, v2] -> f (v1, v2)
+  _        -> fail $ "unary builtin expects 2 argument; got " ++ (show $ length vs)
 
 evalExprs :: Ctx -> [Expr] -> DebugOr [Expr]
 evalExprs ctx = traverse (evalExpr ctx)
