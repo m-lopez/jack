@@ -23,6 +23,8 @@ library
                        Typing
                        Util.DebugOr
                        Repl.Repl
+                       Repl.Commands
+                       Repl.State
   exposed-modules:     Repl
   build-depends:       parsec
                        , monad-loops

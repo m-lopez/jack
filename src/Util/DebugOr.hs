@@ -1,15 +1,12 @@
------------------------------------------------------------------------------
--- |
--- Module      : Util.DebugOr
--- Copyright   : (c) Michael Lopez 2017
--- License     : MIT
---
--- Maintainer  : Michael Lopez
--- Stability   : experimental
---
--- A library for a gathering and reporting compilation errors.
---
-
+{-|
+Module      : Util.DebugOr
+Description : A library for a gathering and reporting compilation errors.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
 module Util.DebugOr (
   DebugOr(..),
   onlySuccessful,
