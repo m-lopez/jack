@@ -11,13 +11,13 @@ module Repl.Repl ( repl ) where
 
 import Parser ( Ast(..), replParse )
 import Expressions ( QType(..), Expr, ExprName(ExprName) )
-import Contexts (
+import Context (
   Ctx(..),
   Binding(..),
   extendVar,
   lookupSignature,
   Binding(BVar) )
-import Typing ( synthExpr, checkTopLevel )
+import Elaboration ( synthExpr, checkTopLevel )
 import Util.DebugOr (
   DebugOr(..),
   showUnderlying,

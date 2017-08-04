@@ -275,9 +275,3 @@ replParse code = case parse rule "REPL parser" code of
   Right x -> mkSuccess x
   where
     rule = try def <|> expr
-
--- FIXME: This is not thought out.
-simpleParse :: String -> DebugOr Ast
-simpleParse s = case parse expr "simple_expression_parser" s of
-  Left x  -> fail $ show x
-  Right x -> mkSuccess x

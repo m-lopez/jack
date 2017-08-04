@@ -1,20 +1,26 @@
 {-# LANGUAGE FlexibleInstances #-}
-
+{-|
+Module      : Evaluator
+Description : Types and operations for managing the elaboration context.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
 module Evaluator ( evalExpr ) where
 
 import Expressions (
   Expr(..),
-  ExprName(ExprName),
+  ExprName,
   substExprs,
   CType(..),
-  QType(..),
-  areStructurallyEqualQType )
-import Contexts (
-  Ctx(Ctx),
+  QType(..) )
+import Context (
+  Ctx,
   Binding(BVar),
   lookupSignature )
 import Util.DebugOr ( DebugOr, requireOrElse, mkSuccess )
-import Data.List ( find )
 
 
 
@@ -44,6 +50,7 @@ evalExpr ctx e = case e of
     res <- evalExpr ctx c
     b   <- asBool res
     if b then evalExpr ctx e1 else evalExpr ctx e2
+  e1 -> mkSuccess e1
 
 evalVar :: Ctx -> ExprName -> QType -> DebugOr Expr
 evalVar ctx x t = do
@@ -60,10 +67,10 @@ evalApp ctx e es = do
     -- FIXME: Add value check here.
     f  <- evalExpr ctx e
     case f of
-      EAbs xs e'    -> evalLambdaApp ctx e' xs vs
-      EUnBuiltin f  -> evalUnaryBuiltin f vs
-      EBinBuiltin f -> evalBinaryBuiltin f vs
-      _             -> fail $ "callee " ++ show f ++ " is not callable"
+      EAbs xs e'     -> evalLambdaApp ctx e' xs vs
+      EUnBuiltin f'  -> evalUnaryBuiltin f' vs
+      EBinBuiltin f' -> evalBinaryBuiltin f' vs
+      _              -> fail $ "callee " ++ show f ++ " is not callable"
 
 evalLambdaApp :: Ctx -> Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
 evalLambdaApp ctx e xs vs = do

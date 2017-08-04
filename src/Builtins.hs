@@ -7,7 +7,7 @@ import Expressions (
   QType(..),
   CType(..),
   Expr(..) )
-import Contexts ( Ctx(Ctx), Binding(BVar) )
+import Context ( Ctx(Ctx), Binding(BVar) )
 import Util.DebugOr ( DebugOr, mkSuccess )
 
 

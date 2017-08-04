@@ -1,4 +1,13 @@
-module Contexts (
+{-|
+Module      : Context
+Description : Types and operations for managing the elaboration context.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
+module Context (
     Ctx(Ctx),
     Binding(BVar),
     extendVars,
@@ -50,6 +59,6 @@ addOrReplaceBinding b@(BVar x t (Just _)) ctx@(Ctx bindings) =
     sameSig (BVar y u _) = x == y && areStructurallyEqualQType t u
 
 replaceFirst :: (a -> Bool) -> a -> [a] -> [a]
-replaceFirst pred a as = case as of
+replaceFirst p a as = case as of
   []        -> []
-  a' : rest -> if pred a' then a : rest else a' : replaceFirst pred a rest
+  a' : rest -> if p a' then a : rest else a' : replaceFirst p a rest

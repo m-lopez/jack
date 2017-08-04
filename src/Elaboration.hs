@@ -1,4 +1,13 @@
-module Typing (
+{-|
+Module      : Elaboration
+Description : Types and operations for managing the elaboration context.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
+module Elaboration (
   synthExpr,
   checkExpr,
   checkType,
@@ -12,8 +21,7 @@ import Util.DebugOr (
   DebugOr(DebugOr),
   onlySuccessful,
   requireOrElse,
-  mkSuccess,
-  isSuccess )
+  mkSuccess )
 import Expressions (
   Expr(..),
   CType(..),
@@ -22,22 +30,15 @@ import Expressions (
   TypeName(..),
   areStructurallyEqualCType,
   areStructurallyEqualQType )
-import Contexts ( Ctx(..), Binding(BVar), extendVars, lookupSignature )
+import Context ( Ctx(..), Binding(BVar), extendVars, lookupSignature )
 
 
---------------------------------------------------------------------------------
--- Helper functions.
 
+-- | A helper function to convert AST symbols to expression symbols.
 toExprName :: AstName -> ExprName
 toExprName (AstName n) = ExprName n
 
-
-
---------------------------------------------------------------------------------
---  Contexts.
-
-
-
+-- | The type of an overload set.
 newtype OverloadSet = OverloadSet { interps :: [(Expr, QType)] }
 
 -- Print just the immediate node.

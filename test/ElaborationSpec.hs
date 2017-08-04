@@ -1,4 +1,4 @@
-module TypingSpec ( typingSpec ) where
+module ElaborationSpec ( elaborationSpec ) where
 
 import Test.HUnit ( assertBool, Test(TestCase, TestList, TestLabel) )
 
@@ -9,9 +9,9 @@ import Expressions (
   CType(..),
   ExprName(..),
   areStructurallyEqualExpr )
-import Typing ( checkExpr )
+import Elaboration ( checkExpr )
 import BuiltIns ( builtinsCtx )
-import Contexts ( Ctx(..), Binding(..) )
+import Context ( Ctx(..), Binding(..) )
 import Util.DebugOr ( DebugOr(..) )
 
 
@@ -147,8 +147,8 @@ builtinCtxTests = [
     (EApp (var "=" $ Unquantified $ CTArrow [CTInt, CTInt] CTBool) [ ELitInt 2, ELitInt 2 ]) ]
 
 -- | Assemble each test suite into a named collection.
-typingSpec :: Test
-typingSpec = TestLabel "Typing tests" $ TestList [
+elaborationSpec :: Test
+elaborationSpec = TestLabel "Typing tests" $ TestList [
   TestLabel "simple type check tests" $              mkPassingTypeCheckTests simpleTests,
   TestLabel "closed expression type check tests" $   mkPassingTypeCheckTests closedTests,
   TestLabel "simple context type check tests" $      mkPassingTypeCheckTests simpleContextTests,
