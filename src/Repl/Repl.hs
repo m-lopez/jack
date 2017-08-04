@@ -6,7 +6,8 @@ import Contexts (
   Ctx(..),
   Binding(..),
   extendVar,
-  lookupSignature )
+  lookupSignature,
+  Binding(BVar) )
 import Typing ( synthExpr, checkTopLevel )
 import Util.DebugOr (
   DebugOr(..),
@@ -60,33 +61,39 @@ dropWhiteSpace s = dropWhileEnd isSpace $ dropWhile isSpace s
 newtype CompilerState = CompilerState { getCtx :: Ctx }
 
 -- | Prints all of the commands.
-helpCmd :: String -> String
-helpCmd arg = if arg == ""
+helpCmd :: CompilerState -> String -> String
+helpCmd _ arg = if arg == ""
   then helpText
   else "the command `help` does not take any arguments"
 
 -- | Elaborates an expression.
-elabCmd :: String -> String
-elabCmd arg = showUnderlying $ fst <$> typeSynth arg
+elabCmd :: CompilerState -> String -> String
+elabCmd state arg = showUnderlying $ fst <$> typeSynth arg
 
 -- | Print the parse tree of code.
-astCmd :: String -> String
-astCmd = parseTree
+astCmd :: CompilerState -> String -> String
+astCmd state = parseTree
 
 -- | Print the type of an expression.
-tCmd :: String -> String
-tCmd arg = showUnderlying $ snd <$> typeSynth arg
+tCmd :: CompilerState -> String -> String
+tCmd state arg = showUnderlying $ snd <$> typeSynth arg
 
 -- | Print the current bindings.
--- bindingsCmd :: String -> String
--- bindingsCmd arg = if arg == ""
---   then showContext
---   else "the command `bindings` does not take any arguments"
+bindingsCmd :: CompilerState -> String -> String
+bindingsCmd (CompilerState (Ctx bindings)) arg = if arg == ""
+  then showContext bindings
+  else "the command `bindings` does not take any arguments"
+  where
+    showContext ctx' = case ctx' of
+      BVar (ExprName x) t _ : ctx'' -> x ++ ": " ++ show t ++ "\n" ++ showContext ctx''
+      [] -> ""
 
 -- | A mock command for exiting the terminal used for the description of
 -- commands.
 mockQuitCmd :: Command
-mockQuitCmd = Command "quit" id "" "Exit the terminal."
+mockQuitCmd = Command "quit" emptyCmd "" "Exit the terminal."
+  where
+    emptyCmd x y = ""
 
 -- | The help text.
 -- FIXME: Break this up and put it in another file!
@@ -103,7 +110,7 @@ helpText = header ++ "\n" ++ concat descLines
 -- | A Toaster REPL command. There is always the implicit.
 data Command = Command {
   getName ::        String,
-  getProcedure ::   String -> String,
+  getProcedure ::   CompilerState -> String -> String,
   getExampleArgs :: String,
   getDescription :: String
 }
@@ -118,23 +125,27 @@ commands = [
     "Prints the elaborated for of the expression `e`.",
   Command "help" helpCmd ""
     "Print the command list.",
-  -- Command "bindigs" bindingsCmd ""
-  --   "Prints all bindings in the current context",
+  Command "bindings" bindingsCmd ""
+    "Prints all bindings in the current context",
   Command "t" tCmd "<e>"
     "Prints the type of an expression `e`." ]
 
 -- | Matches the input command `cmd` with one of the commands.
-matchCmd :: String -> Maybe String
-matchCmd cmd = matchCmdRec cmd commands
+matchCmd :: CompilerState -> String -> Maybe String
+matchCmd state cmd = matchCmdRec cmd commands
   where
+    matchCmdRec :: String -> [Command] -> Maybe String
     matchCmdRec cmd []     = Nothing
     matchCmdRec cmd (c:cs) = case stripPrefix (getName c) cmd of
-      Just arg -> Just $ getProcedure c $ dropWhiteSpace arg
+      Just arg -> Just $ func state justArg
+        where
+          func = getProcedure c
+          justArg = dropWhiteSpace arg
       Nothing  -> matchCmdRec cmd cs
 
 -- | Executes a command.
-execCmd :: String -> String
-execCmd cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd cmd)
+execCmd :: CompilerState -> String -> String
+execCmd state cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd state cmd)
 
 -- | Prints a definition.
 showDef :: (ExprName, QType, Expr) -> String
@@ -179,7 +190,7 @@ evalCode state code = fromDebug attempt id (\x -> (state, x))
 evalThenPrint2 :: (CompilerState, String) -> (CompilerState, String)
 evalThenPrint2 (state, input) = case input of
   []        -> (state, input)
-  ':' : cmd -> (state, execCmd cmd)
+  ':' : cmd -> (state, execCmd state cmd)
   _         -> evalCode state input
 
 -- | True iff this string is a quit command.
