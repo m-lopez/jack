@@ -15,9 +15,10 @@ import Context (
   Ctx(..),
   Binding(..),
   extendVar,
+  declare,
   lookupSignature,
   Binding(BVar) )
-import Elaboration ( synthExpr, checkTopLevel )
+import Elaboration ( synthExpr, checkTopLevelBinding )
 import Util.DebugOr (
   DebugOr(..),
   showUnderlying,
@@ -51,14 +52,16 @@ showDef (ExprName s, t, e) =
   "defined " ++ show s ++ ": " ++ show t ++ " := " ++ show e
 
 -- | Attempt to evaluate a top-level definition.
-evalDefinition :: CompilerState -> Ast -> DebugOr (CompilerState, String)
-evalDefinition state ast@(ADef _ _ _) = do
-  (x, t, e) <- checkTopLevel ctx ast
-  v <- evalExpr ctx e
-  return (CompilerState $ extendVar x t v ctx, showDef x t v)
+evalTopLevelBinding :: CompilerState -> Ast -> DebugOr (CompilerState, String)
+evalTopLevelBinding state ast = do
+  (x, t, e_maybe) <- checkTopLevelBinding ctx ast
+  case evalExpr ctx <$> e_maybe of
+    Just v -> (\v' -> (CompilerState $ extendVar x t v' ctx, showDef x t v')) <$> v
+    Nothing -> return (CompilerState $ declare x t ctx, showDecl x t)
   where
     ctx = getCtx state
     showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v
+    showDecl x t = "declared " ++ show x ++ ": " ++ show t
 
 -- | Evaluates a top-level expression.
 evalExpression :: CompilerState -> Ast -> String
@@ -69,13 +72,20 @@ evalExpression state ast = showUnderlying v'
       v <- evalExpr (getCtx state) e
       return $ show v ++ " : " ++ show t
 
+-- | True iff the AST is a top-level binding.
+isTopLevelBinding :: Ast -> Bool
+isTopLevelBinding p = case p of
+  ADecl _ _ -> True
+  ADef _ _ _ -> True
+  _ -> False
+
 -- | Attempt to apply Toaster's evaluation rules to compute a value.
 tryEvalCode :: CompilerState -> String -> DebugOr (CompilerState, String)
 tryEvalCode state source = do
   ast <- replParse source
-  case ast of
-    ADef _ _ _ -> evalDefinition state ast
-    _          -> return (state, evalExpression state ast)
+  if isTopLevelBinding ast
+    then evalTopLevelBinding state ast
+    else return (state, evalExpression state ast)
 
 -- | Apply Toaster's evaluation rules to compute a value or print any
 -- encountered error and leave the context as it is.

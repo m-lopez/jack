@@ -12,6 +12,7 @@ module Context (
     Binding(BVar),
     extendVars,
     extendVar,
+    declare,
     varValue, varName, varType,
     lookupSignature,
     addOrReplaceBinding ) where
@@ -34,6 +35,10 @@ extendVars :: [(ExprName, QType, Maybe Expr)] -> Ctx -> Ctx
 extendVars xts (Ctx ctx) = Ctx (new_bindings ++ ctx)
   where
     new_bindings = map (\(x1, x2, x3) -> BVar x1 x2 x3) xts
+
+-- | Add a binding to the context with no initial value.
+declare :: ExprName -> QType -> Ctx -> Ctx
+declare x t (Ctx bindings) = Ctx $ BVar x t Nothing : bindings
 
 -- | True iff a binding has the signature `x: t`.
 hasSig :: ExprName -> QType -> Binding -> Bool

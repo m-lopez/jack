@@ -11,7 +11,7 @@ module Elaboration (
   synthExpr,
   checkExpr,
   checkType,
-  checkTopLevel ) where
+  checkTopLevelBinding ) where
 
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
@@ -261,12 +261,17 @@ requireNotDefined ctx x t = let
     DebugOr (Right (BVar _ _ (Just _))) -> fail $ "attempting to redefine " ++ show (x,t)
     _ -> mkSuccess ()
 
--- | FIXME: Ad-hoc. No thought went into this.
-checkTopLevel :: Ctx -> Ast -> DebugOr (ExprName, QType, Expr)
-checkTopLevel ctx (ADef x_p t_p e_p) = do
-  t <- checkType ctx t_p
-  let x = toExprName x_p
-  _ <- requireNotDefined ctx x t
-  (e, _) <- checkExpr ctx e_p t
-  return (x, t, e)
-checkTopLevel _ p = fail $ "expected a definition; got " ++ show p
+-- | Type check a top-level declaration of definition.
+checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Maybe Expr)
+checkTopLevelBinding ctx p = case p of
+  ADecl x_p t_p -> do
+    t <- checkType ctx t_p
+    let x = toExprName x_p
+    return (x, t, Nothing)
+  ADef x_p t_p e_p -> do
+    t <- checkType ctx t_p
+    let x = toExprName x_p
+    _ <- requireNotDefined ctx x t
+    (e, _) <- checkExpr ctx e_p t
+    return (x, t, Just e)
+  _ -> fail $ "expected a binding; got " ++ show p
