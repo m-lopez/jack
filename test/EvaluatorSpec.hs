@@ -1,4 +1,4 @@
-module EvaluationSpec ( evalSpec ) where
+module EvaluatorSpec ( evalSpec ) where
 
 import Test.HUnit ( assertBool, Test(TestCase, TestList, TestLabel) )
 import Expressions (

@@ -1,7 +1,7 @@
 module ParserSpec ( parserSpec ) where
 
 import Test.HUnit ( assertEqual, Test(TestCase, TestList, TestLabel) )
-import Parser ( simpleParse, Ast(..), AstName (..) )
+import Parser ( replParse, Ast(..), AstName (..) )
 import Util.DebugOr ( debugRep )
 
 
@@ -14,7 +14,7 @@ sym = AName . AstName
 
 -- Run the parser
 tryParse :: String -> Either String Ast
-tryParse s = case debugRep $ simpleParse s of
+tryParse s = case debugRep $ replParse s of
   Left x  -> Left $ show x
   Right x -> Right x
 

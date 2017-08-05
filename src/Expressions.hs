@@ -39,7 +39,7 @@ instance Show Expr where
     EVar (ExprName x) t -> x ++ "_{" ++ show t ++ "}"
     EAbs bs e1 -> "\\(" ++ intercalate ", " (map show bs) ++ ") -> " ++ show e1
     EApp e1 es -> "(" ++ show e1 ++ ")" ++ "(" ++ intercalate ", " (map show es) ++ ")"
-    EIf e1 e2 e3 -> "if " ++ show e1 ++ " then " ++ " else " ++ show e3
+    EIf e1 e2 e3 -> "if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3
     EUnBuiltin _ -> "<built-in>"
     EBinBuiltin _ -> "<built-in>"
 
@@ -76,6 +76,7 @@ substExpr x t v e =
         is_x_t (y,t') = (x == y) && (areStructurallyEqualQType t $ Unquantified t')
     EApp e1 args     -> EApp (subst_on e1) (map subst_on args)
     EIf c e1 e2      -> EIf (subst_on c) (subst_on e1) (subst_on e2)
+    e1 -> e1
 
 substExprs :: [((ExprName, QType), Expr)] -> Expr -> Expr
 substExprs param_map = foldr (.) id subst_ons

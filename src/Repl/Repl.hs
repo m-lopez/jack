@@ -1,14 +1,24 @@
+{-|
+Module      : Repl.Repl
+Description : Implementation of the default Toaster REPL.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
 module Repl.Repl ( repl ) where
 
 import Parser ( Ast(..), replParse )
 import Expressions ( QType(..), Expr, ExprName(ExprName) )
-import Contexts (
+import Context (
   Ctx(..),
   Binding(..),
   extendVar,
+  declare,
   lookupSignature,
   Binding(BVar) )
-import Typing ( synthExpr, checkTopLevel )
+import Elaboration ( synthExpr, checkTopLevelBinding )
 import Util.DebugOr (
   DebugOr(..),
   showUnderlying,
@@ -18,19 +28,15 @@ import Util.DebugOr (
 import Evaluator ( evalExpr )
 import BuiltIns ( builtinsCtx )
 import Data.Char ( isSpace, isAlphaNum )
-import Data.Maybe ( fromMaybe )
-import Data.List ( dropWhile, dropWhileEnd, stripPrefix )
-
+import Data.List ( stripPrefix )
+import Repl.State ( CompilerState(..) )
+import Repl.Commands ( executeCommand )
 import System.IO ( IO, putStr, putStrLn, hFlush, stdout )
 
 -- | The welcome text for the repl.
 welcomeText :: String
 welcomeText =
   "Welcome to the BT language. For a list of commands, type `:help`."
-
--- | Unrecognized command message.
-unrecognizedCommand :: String -> String
-unrecognizedCommand cmd = "unrecognized command `" ++ cmd ++ "`; try `:help`"
 
 -- | Immediately flushes the standard output buffer.
 flushStr :: String -> IO ()
@@ -40,127 +46,22 @@ flushStr s = putStr s >> hFlush stdout
 prompt :: String -> IO String
 prompt s = flushStr s >> getLine
 
--- | Prints a parse tree.
-parseTree :: String -> String
-parseTree s = showUnderlying $ replParse s
-
--- | Prints the type of an expression.
--- FIXME: We have demonstrated the need to print expressions in a debug and
---        source code mode.
-typeSynth :: String -> DebugOr (Expr, QType)
-typeSynth s = do
-  ast <- replParse s
-  (e, t) <- synthExpr builtinsCtx ast
-  return (e, t)
-
--- | Removes preceding and trailing whitespace.
-dropWhiteSpace :: String -> String
-dropWhiteSpace s = dropWhileEnd isSpace $ dropWhile isSpace s
-
--- | Compiler state.
-newtype CompilerState = CompilerState { getCtx :: Ctx }
-
--- | Prints all of the commands.
-helpCmd :: CompilerState -> String -> String
-helpCmd _ arg = if arg == ""
-  then helpText
-  else "the command `help` does not take any arguments"
-
--- | Elaborates an expression.
-elabCmd :: CompilerState -> String -> String
-elabCmd state arg = showUnderlying $ fst <$> typeSynth arg
-
--- | Print the parse tree of code.
-astCmd :: CompilerState -> String -> String
-astCmd state = parseTree
-
--- | Print the type of an expression.
-tCmd :: CompilerState -> String -> String
-tCmd state arg = showUnderlying $ snd <$> typeSynth arg
-
--- | Print the current bindings.
-bindingsCmd :: CompilerState -> String -> String
-bindingsCmd (CompilerState (Ctx bindings)) arg = if arg == ""
-  then showContext bindings
-  else "the command `bindings` does not take any arguments"
-  where
-    showContext ctx' = case ctx' of
-      BVar (ExprName x) t _ : ctx'' -> x ++ ": " ++ show t ++ "\n" ++ showContext ctx''
-      [] -> ""
-
--- | A mock command for exiting the terminal used for the description of
--- commands.
-mockQuitCmd :: Command
-mockQuitCmd = Command "quit" emptyCmd "" "Exit the terminal."
-  where
-    emptyCmd x y = ""
-
--- | The help text.
--- FIXME: Break this up and put it in another file!
-helpText :: String
-helpText = header ++ "\n" ++ concat descLines
-  where
-    header = "Here is a list of commands."
-    allCommands = commands ++ [ mockQuitCmd ]
-    indent = "  "
-    argColLength = foldl max 0 $ map (\x -> ((length $ getExampleArgs x) + (length $ getName x))) allCommands
-    printCmdLine (Command name _ args desc) = indent ++ ":" ++ name ++ " " ++ args ++ replicate (argColLength - (length args + length name) + 1) ' ' ++ desc ++ "\n"
-    descLines = map printCmdLine allCommands
-
--- | A Toaster REPL command. There is always the implicit.
-data Command = Command {
-  getName ::        String,
-  getProcedure ::   CompilerState -> String -> String,
-  getExampleArgs :: String,
-  getDescription :: String
-}
-
--- | A command is a string and a function that parsers the preceeding arguments.
--- FIXME: Move this to another file.
-commands :: [Command]
-commands = [
-  Command "ast" astCmd "<e>"
-    "Prints the parse tree of an expression `e`.",
-  Command "elab" elabCmd "<e>"
-    "Prints the elaborated for of the expression `e`.",
-  Command "help" helpCmd ""
-    "Print the command list.",
-  Command "bindings" bindingsCmd ""
-    "Prints all bindings in the current context",
-  Command "t" tCmd "<e>"
-    "Prints the type of an expression `e`." ]
-
--- | Matches the input command `cmd` with one of the commands.
-matchCmd :: CompilerState -> String -> Maybe String
-matchCmd state cmd = matchCmdRec cmd commands
-  where
-    matchCmdRec :: String -> [Command] -> Maybe String
-    matchCmdRec cmd []     = Nothing
-    matchCmdRec cmd (c:cs) = case stripPrefix (getName c) cmd of
-      Just arg -> Just $ func state justArg
-        where
-          func = getProcedure c
-          justArg = dropWhiteSpace arg
-      Nothing  -> matchCmdRec cmd cs
-
--- | Executes a command.
-execCmd :: CompilerState -> String -> String
-execCmd state cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd state cmd)
-
 -- | Prints a definition.
 showDef :: (ExprName, QType, Expr) -> String
 showDef (ExprName s, t, e) =
   "defined " ++ show s ++ ": " ++ show t ++ " := " ++ show e
 
 -- | Attempt to evaluate a top-level definition.
-evalDefinition :: CompilerState -> Ast -> DebugOr (CompilerState, String)
-evalDefinition state ast@(ADef _ _ _) = do
-  (x, t, e) <- checkTopLevel ctx ast
-  v <- evalExpr ctx e
-  return (CompilerState $ extendVar x t v ctx, showDef x t v)
+evalTopLevelBinding :: CompilerState -> Ast -> DebugOr (CompilerState, String)
+evalTopLevelBinding state ast = do
+  (x, t, e_maybe) <- checkTopLevelBinding ctx ast
+  case evalExpr ctx <$> e_maybe of
+    Just v -> (\v' -> (CompilerState $ extendVar x t v' ctx, showDef x t v')) <$> v
+    Nothing -> return (CompilerState $ declare x t ctx, showDecl x t)
   where
     ctx = getCtx state
     showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v
+    showDecl x t = "declared " ++ show x ++ ": " ++ show t
 
 -- | Evaluates a top-level expression.
 evalExpression :: CompilerState -> Ast -> String
@@ -171,13 +72,20 @@ evalExpression state ast = showUnderlying v'
       v <- evalExpr (getCtx state) e
       return $ show v ++ " : " ++ show t
 
+-- | True iff the AST is a top-level binding.
+isTopLevelBinding :: Ast -> Bool
+isTopLevelBinding p = case p of
+  ADecl _ _ -> True
+  ADef _ _ _ -> True
+  _ -> False
+
 -- | Attempt to apply Toaster's evaluation rules to compute a value.
 tryEvalCode :: CompilerState -> String -> DebugOr (CompilerState, String)
 tryEvalCode state source = do
   ast <- replParse source
-  case ast of
-    ADef _ _ _ -> evalDefinition state ast
-    _          -> return (state, evalExpression state ast)
+  if isTopLevelBinding ast
+    then evalTopLevelBinding state ast
+    else return (state, evalExpression state ast)
 
 -- | Apply Toaster's evaluation rules to compute a value or print any
 -- encountered error and leave the context as it is.
@@ -190,7 +98,7 @@ evalCode state code = fromDebug attempt id (\x -> (state, x))
 evalThenPrint2 :: (CompilerState, String) -> (CompilerState, String)
 evalThenPrint2 (state, input) = case input of
   []        -> (state, input)
-  ':' : cmd -> (state, execCmd state cmd)
+  ':' : cmd -> (state, executeCommand state cmd)
   _         -> evalCode state input
 
 -- | True iff this string is a quit command.

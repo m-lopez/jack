@@ -41,6 +41,7 @@ data Ast =
   | ACoerce   Ast Ast
   | AInit     [Ast]
   | ADef      AstName Ast Ast
+  | ADecl     AstName Ast
   deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
@@ -253,11 +254,7 @@ arrowType = try (AArrow <$> arrow_head <*> arrowType)
     arrow_head  = enclosed "(" types ")" <* requireSymbol "->"
     simple_head = pure <$> baseType <* requireSymbol "->" :: Parser [Ast]
 
-
-
---------------------------------------------------------------------------------
---  Parse rules for definitions.
-
+-- | A parse rule for unquantified definitions.
 def :: Parser Ast
 def = mkDef <$> def_head <*> expr
   where
@@ -265,19 +262,14 @@ def = mkDef <$> def_head <*> expr
     mkDef :: (AstName, Ast) -> Ast -> Ast
     mkDef = uncurry ADef
 
+-- | A parse rule for declarations.
+decl :: Parser Ast
+decl = uncurry ADecl <$> binding
 
-
---------------------------------------------------------------------------------
---  A REPL parser.
+-- | A parser for the REPL.
 replParse :: String -> DebugOr Ast
 replParse code = case parse rule "REPL parser" code of
   Left x -> fail $ show x
   Right x -> mkSuccess x
   where
-    rule = try def <|> expr
-
--- FIXME: This is not thought out.
-simpleParse :: String -> DebugOr Ast
-simpleParse s = case parse expr "simple_expression_parser" s of
-  Left x  -> fail $ show x
-  Right x -> mkSuccess x
+    rule = try def <|> try decl <|> expr

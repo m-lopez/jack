@@ -16,13 +16,15 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   other-modules:       BuiltIns
-                       Contexts
+                       Context
                        Evaluator
                        Expressions
                        Parser
-                       Typing
+                       Elaboration
                        Util.DebugOr
                        Repl.Repl
+                       Repl.Commands
+                       Repl.State
   exposed-modules:     Repl
   build-depends:       parsec
                        , monad-loops
@@ -50,8 +52,9 @@ test-suite jack-test
                        , parsec
                        , HUnit
                        , jack
-  other-modules:       BuiltIns Contexts EvaluationSpec Evaluator Expressions
-                       Parser ParserSpec Typing TypingSpec Util.DebugOr
+  other-modules:       BuiltIns Context EvaluatorSpec Evaluator Expressions
+                       Parser ParserSpec Elaboration ElaborationSpec
+                       Util.DebugOr
   ghc-options:         -Werror
                        -Wall
                        -fwarn-tabs

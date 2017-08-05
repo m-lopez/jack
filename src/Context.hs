@@ -1,8 +1,18 @@
-module Contexts (
+{-|
+Module      : Context
+Description : Types and operations for managing the elaboration context.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
+module Context (
     Ctx(Ctx),
     Binding(BVar),
     extendVars,
     extendVar,
+    declare,
     varValue, varName, varType,
     lookupSignature,
     addOrReplaceBinding ) where
@@ -25,6 +35,10 @@ extendVars :: [(ExprName, QType, Maybe Expr)] -> Ctx -> Ctx
 extendVars xts (Ctx ctx) = Ctx (new_bindings ++ ctx)
   where
     new_bindings = map (\(x1, x2, x3) -> BVar x1 x2 x3) xts
+
+-- | Add a binding to the context with no initial value.
+declare :: ExprName -> QType -> Ctx -> Ctx
+declare x t (Ctx bindings) = Ctx $ BVar x t Nothing : bindings
 
 -- | True iff a binding has the signature `x: t`.
 hasSig :: ExprName -> QType -> Binding -> Bool
@@ -50,6 +64,6 @@ addOrReplaceBinding b@(BVar x t (Just _)) ctx@(Ctx bindings) =
     sameSig (BVar y u _) = x == y && areStructurallyEqualQType t u
 
 replaceFirst :: (a -> Bool) -> a -> [a] -> [a]
-replaceFirst pred a as = case as of
+replaceFirst p a as = case as of
   []        -> []
-  a' : rest -> if pred a' then a : rest else a' : replaceFirst pred a rest
+  a' : rest -> if p a' then a : rest else a' : replaceFirst p a rest
