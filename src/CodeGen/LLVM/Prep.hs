@@ -169,3 +169,4 @@ resolve ctx = traverse (resolveDef ctx)
     maybeGetInit ctx x ct = fromDebugOr lkp varValue (const Nothing)
       where
         lkp = lookupSignature ctx x (Unquantified ct)
+

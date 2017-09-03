@@ -206,7 +206,7 @@ mkSimpleFunction bindings symbols nm e = G.functionDefaults {
 toLlvmModuleAst :: [TlExpr] -> DebugOr A.Module
 toLlvmModuleAst tls = do
   prepped <- prep tls
-  let symbols = topLevelSymbols tls
+  let symbols = topLevelSymbols prepped
   let defs = catMaybes $ genDefs symbols prepped
   return A.defaultModule {
     A.moduleName = "toaster-module",
