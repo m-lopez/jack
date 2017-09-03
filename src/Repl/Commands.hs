@@ -130,3 +130,4 @@ matchCmd state cmd = matchCmdRec cmd commands
 -- | Executes a command.
 executeCommand :: CompilerState -> String -> String
 executeCommand state cmd = fromMaybe (unrecognizedCommand cmd) (matchCmd state cmd)
+
