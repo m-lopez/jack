@@ -20,11 +20,11 @@ import Context (
   Binding(BVar) )
 import Elaboration ( synthExpr, checkTopLevelBinding )
 import Util.DebugOr (
-  DebugOr(..),
+  DebugOr,
   showUnderlying,
   mkSuccess,
   isSuccess,
-  fromDebug )
+  fromDebugOr )
 import Evaluator ( evalExpr )
 import Builtins ( builtinsCtx )
 import Data.Char ( isSpace, isAlphaNum )
@@ -90,7 +90,7 @@ tryEvalCode state source = do
 -- | Apply Toaster's evaluation rules to compute a value or print any
 -- encountered error and leave the context as it is.
 evalCode :: CompilerState -> String -> (CompilerState, String)
-evalCode state code = fromDebug attempt id (\x -> (state, x))
+evalCode state code = fromDebugOr attempt id (\x -> (state, x))
   where
     attempt = tryEvalCode state code
 

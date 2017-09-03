@@ -18,10 +18,11 @@ module Elaboration (
 
 import Parser (Ast(..), AstName(AstName))
 import Util.DebugOr (
-  DebugOr(DebugOr),
+  DebugOr,
   onlySuccessful,
   requireOrElse,
-  mkSuccess )
+  mkSuccess,
+  fromDebugOr )
 import Expressions (
   Expr(..),
   CType(..),
@@ -112,12 +113,6 @@ resolve ctx p ps = case p of
   -- FIXME: Should support lambdas.
   ast -> fail $ "attempted overload resolution on an uncallable expression; got " ++ show ast
 
-
-
-
-
-
-
 --------------------------------------------------------------------------------
 --  Lookup and selection system.
 --
@@ -129,7 +124,7 @@ lookupVar (AstName n) (Ctx bindings) =
   let
     var_binding_has_name v b = case b of BVar v' _ _ -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
-  in DebugOr $ Right $ OverloadSet $
+  in mkSuccess $ OverloadSet $
     map (\(BVar x t _) -> (EVar x t, t)) overloads
 
 -- Select from an overload on type.
@@ -146,9 +141,7 @@ selectByType t (OverloadSet ovld) =
 --  Kind checking.
 
 checkType :: Ctx -> Ast -> DebugOr QType
-checkType ctx p = let DebugOr k = checkUnquantType ctx p in case k of
-  Left err -> DebugOr $ Left err
-  Right t  -> DebugOr $ Right $ Unquantified t
+checkType ctx p = Unquantified <$> checkUnquantType ctx p
 
 checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
@@ -255,11 +248,13 @@ checkExprs ctx = traverse (uncurry $ checkExpr ctx)
 
 -- | Requires that `x:t` is not defined.
 requireNotDefined :: Ctx -> ExprName -> QType -> DebugOr ()
-requireNotDefined ctx x t = let
+requireNotDefined ctx x t = fromDebugOr b failIfRedefine (const sure)
+  where
     b = lookupSignature ctx x t
-  in case b of
-    DebugOr (Right (BVar _ _ (Just _))) -> fail $ "attempting to redefine " ++ show (x,t)
-    _ -> mkSuccess ()
+    sure = mkSuccess ()
+    failIfRedefine y = case y of
+      BVar _ _ (Just _) -> fail $ "attempting to redefine " ++ show (x,t)
+      _ -> sure
 
 -- | Type check a top-level declaration of definition.
 checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Maybe Expr)
