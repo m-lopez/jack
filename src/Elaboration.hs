@@ -11,26 +11,35 @@ module Elaboration (
   synthExpr,
   checkExpr,
   checkType,
-  checkTopLevelBinding ) where
+  checkTopLevelBinding,
+  elabModule ) where
 
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
 
-import Parser (Ast(..), AstName(AstName))
+import Ast.Parser (Ast(..), AstName(AstName))
 import Util.DebugOr (
-  DebugOr(DebugOr),
+  DebugOr,
   onlySuccessful,
   requireOrElse,
-  mkSuccess )
+  mkSuccess,
+  fromDebugOr )
 import Expressions (
   Expr(..),
   CType(..),
   QType(..),
   ExprName(..),
   TypeName(..),
+  TlExpr(..),
   areStructurallyEqualCType,
   areStructurallyEqualQType )
-import Context ( Ctx(..), Binding(BVar), extendVars, lookupSignature )
+import Context (
+  Ctx(..),
+  Binding(BVar),
+  extendVars,
+  lookupSignature,
+  addBinding,
+  isDef )
 
 
 
@@ -107,7 +116,7 @@ resolve ctx p ps = case p of
   AName n -> do
     cands   <- lookupVar n ctx                          -- Computes a candidate set
     viables <- onlySuccessful $ map (\(f, t) -> viable ctx f t ps) $ interps cands  -- Computes viable functions
-    _       <- requireOrElse (not $ null viables) "no valid interpretations for application"
+    _       <- requireOrElse (not $ null viables) ("no valid interpretations for application" ++ show p)
     return $ OverloadSet viables
   -- FIXME: Should support lambdas.
   ast -> fail $ "attempted overload resolution on an uncallable expression; got " ++ show ast
@@ -129,7 +138,7 @@ lookupVar (AstName n) (Ctx bindings) =
   let
     var_binding_has_name v b = case b of BVar v' _ _ -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
-  in DebugOr $ Right $ OverloadSet $
+  in mkSuccess $ OverloadSet $
     map (\(BVar x t _) -> (EVar x t, t)) overloads
 
 -- Select from an overload on type.
@@ -146,14 +155,12 @@ selectByType t (OverloadSet ovld) =
 --  Kind checking.
 
 checkType :: Ctx -> Ast -> DebugOr QType
-checkType ctx p = let DebugOr k = checkUnquantType ctx p in case k of
-  Left err -> DebugOr $ Left err
-  Right t  -> DebugOr $ Right $ Unquantified t
+checkType ctx p = Unquantified <$> checkUnquantType ctx p
 
 checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
   ATypeBool -> mkSuccess CTBool
-  ATypeInt -> mkSuccess CTInt
+  ATypeInt -> mkSuccess CTI32
   AArrow ps p' -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p'
@@ -190,7 +197,7 @@ synthExpr ctx p = case p of
   ALitBool b  ->
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   ->
-    return (ELitInt i, Unquantified CTInt)
+    return (ELitInt i, Unquantified CTI32)
   AName px -> do
     viable_var <- lookupVar px ctx
     requireSingleton viable_var p
@@ -224,8 +231,8 @@ checkExpr ctx p ret_t = case p of
     requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTBool)) "need better err msg"
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTInt)) "need better err msg"
-    return (ELitInt i, Unquantified CTInt)
+    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTI32)) "need better err msg"
+    return (ELitInt i, Unquantified CTI32)
   AName px -> do
     viable_func <- lookupVar px ctx
     selectByType ret_t viable_func
@@ -255,23 +262,37 @@ checkExprs ctx = traverse (uncurry $ checkExpr ctx)
 
 -- | Requires that `x:t` is not defined.
 requireNotDefined :: Ctx -> ExprName -> QType -> DebugOr ()
-requireNotDefined ctx x t = let
-    b = lookupSignature ctx x t
-  in case b of
-    DebugOr (Right (BVar _ _ (Just _))) -> fail $ "attempting to redefine " ++ show (x,t)
-    _ -> mkSuccess ()
+requireNotDefined ctx x t = if fromDebugOr (lookupSignature ctx x t) isDef (const False)
+  then fail $ "attempting to redefine " ++ show (x,t)
+  else mkSuccess ()
 
--- | Type check a top-level declaration of definition.
-checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Maybe Expr)
+-- | Type check a top-level declaration or definition.
+-- FIXME: Why does this not return a binding?
+checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Expr)
 checkTopLevelBinding ctx p = case p of
-  ADecl x_p t_p -> do
-    t <- checkType ctx t_p
-    let x = toExprName x_p
-    return (x, t, Nothing)
   ADef x_p t_p e_p -> do
     t <- checkType ctx t_p
     let x = toExprName x_p
     _ <- requireNotDefined ctx x t
     (e, _) <- checkExpr ctx e_p t
-    return (x, t, Just e)
+    return (x, t, e)
   _ -> fail $ "expected a binding; got " ++ show p
+
+-- | Elaborate a module. The result is a well-typed program and a context with
+-- the declarations and definitions contained in the module.
+-- FIXME: This is single-pass semantics. The first run should be declaration
+-- checking only. Then that context should be used to type check. This is very
+-- difficult since type evaluation needs to be checked.
+elabModule :: Ctx -> [Ast] -> DebugOr ([TlExpr], Ctx)
+elabModule ctx = foldl f init
+  where
+    f :: DebugOr ([TlExpr], Ctx) -> Ast -> DebugOr ([TlExpr], Ctx)
+    f prev ast = prev >>= g ast
+    init :: DebugOr ([TlExpr], Ctx)
+    init = mkSuccess ([], ctx)
+    g :: Ast -> ([TlExpr], Ctx) -> DebugOr ([TlExpr], Ctx)
+    g ast' (es, ctx') = do
+      (ExprName x, t, init_maybe) <- checkTopLevelBinding ctx' ast'
+      ctx'' <- addBinding (BVar (ExprName x) t (Just init_maybe)) ctx'
+      return (TlDef x t init_maybe : es, ctx'')
+

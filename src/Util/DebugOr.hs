@@ -8,7 +8,7 @@ Stability   : unstable
 Portability : non-portable
 -}
 module Util.DebugOr (
-  DebugOr(..),
+  DebugOr,
   onlySuccessful,
   requireOrElse,
   mkSuccess,
@@ -17,11 +17,9 @@ module Util.DebugOr (
   showUnderlying,
   isSuccess,
   justOrErr,
-  fromDebug ) where
+  fromDebugOr ) where
 
 import Data.Either ( rights )
-
-
 
 -- | A monad for debug errors. It wraps `Either` and is right-biased.
 newtype DebugOr a = DebugOr { debugRep :: Either String a}
@@ -88,13 +86,14 @@ isSuccess (DebugOr x) = case x of
   Left _  -> False
   Right _ -> True
 
+-- | Transform a `Maybe` into a `DebugOr`.
 justOrErr :: Maybe a -> String -> DebugOr a
 justOrErr a msg = case a of
   Just a' -> mkSuccess a'
   Nothing -> fail msg
 
--- | Map over each of the cases inot a common type.
-fromDebug :: DebugOr a -> (a -> b) -> (String -> b) -> b
-fromDebug (DebugOr x) f g = case x of
+-- | Map over each of the cases into a common type.
+fromDebugOr :: DebugOr a -> (a -> b) -> (String -> b) -> b
+fromDebugOr (DebugOr x) f g = case x of
   Left s  -> g s
   Right y -> f y

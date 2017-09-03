@@ -9,7 +9,7 @@ Portability : non-portable
 -}
 module Repl.Repl ( repl ) where
 
-import Parser ( Ast(..), replParse )
+import Ast.Parser ( Ast(..), replParse )
 import Expressions ( QType(..), Expr, ExprName(ExprName) )
 import Context (
   Ctx(..),
@@ -20,13 +20,13 @@ import Context (
   Binding(BVar) )
 import Elaboration ( synthExpr, checkTopLevelBinding )
 import Util.DebugOr (
-  DebugOr(..),
+  DebugOr,
   showUnderlying,
   mkSuccess,
   isSuccess,
-  fromDebug )
+  fromDebugOr )
 import Evaluator ( evalExpr )
-import BuiltIns ( builtinsCtx )
+import Builtins ( builtinsCtx )
 import Data.Char ( isSpace, isAlphaNum )
 import Data.List ( stripPrefix )
 import Repl.State ( CompilerState(..) )
@@ -54,10 +54,9 @@ showDef (ExprName s, t, e) =
 -- | Attempt to evaluate a top-level definition.
 evalTopLevelBinding :: CompilerState -> Ast -> DebugOr (CompilerState, String)
 evalTopLevelBinding state ast = do
-  (x, t, e_maybe) <- checkTopLevelBinding ctx ast
-  case evalExpr ctx <$> e_maybe of
-    Just v -> (\v' -> (CompilerState $ extendVar x t v' ctx, showDef x t v')) <$> v
-    Nothing -> return (CompilerState $ declare x t ctx, showDecl x t)
+  (x, t, e) <- checkTopLevelBinding ctx ast
+  v <- evalExpr ctx e
+  return (CompilerState $ extendVar x t v ctx, showDef x t v)
   where
     ctx = getCtx state
     showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v
@@ -75,8 +74,7 @@ evalExpression state ast = showUnderlying v'
 -- | True iff the AST is a top-level binding.
 isTopLevelBinding :: Ast -> Bool
 isTopLevelBinding p = case p of
-  ADecl _ _ -> True
-  ADef _ _ _ -> True
+  ADef { } -> True
   _ -> False
 
 -- | Attempt to apply Toaster's evaluation rules to compute a value.
@@ -90,7 +88,7 @@ tryEvalCode state source = do
 -- | Apply Toaster's evaluation rules to compute a value or print any
 -- encountered error and leave the context as it is.
 evalCode :: CompilerState -> String -> (CompilerState, String)
-evalCode state code = fromDebug attempt id (\x -> (state, x))
+evalCode state code = fromDebugOr attempt id (\x -> (state, x))
   where
     attempt = tryEvalCode state code
 

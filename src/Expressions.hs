@@ -7,6 +7,7 @@ module Expressions(
   CType(..),
   ExprName(..),
   TypeName(..),
+  TlExpr(..),
   substExpr,
   substExprs,
   areStructurallyEqualExpr,
@@ -15,6 +16,7 @@ module Expressions(
 
 import Util.DebugOr ( DebugOr )
 import Data.List ( intercalate )
+import Data.Int ( Int32 )
 
 -- | Symbols.
 newtype ExprName = ExprName String deriving (Show, Eq)
@@ -23,13 +25,20 @@ newtype TypeName = TypeName String deriving (Show, Eq)
 -- | Expression syntax for type checking.
 data Expr =
     ELitBool    Bool
-  | ELitInt     Integer
+  | ELitInt     Int32
   | EVar        ExprName QType
   | EAbs        [(ExprName, CType)] Expr
   | EApp        Expr [Expr]
   | EIf         Expr Expr Expr
-  | EUnBuiltin  (Expr -> DebugOr Expr)
-  | EBinBuiltin ((Expr, Expr) -> DebugOr Expr)
+  -- FIXME: Need a better technique for IDing intrinsics.
+  | EUnBuiltin  String String (Expr -> DebugOr Expr)
+  | EBinBuiltin String String ((Expr, Expr) -> DebugOr Expr)
+
+-- | A top-level expression.
+data TlExpr =
+  TlDef String QType Expr |
+  TlFuncDef String [(String, CType)] CType Expr
+  deriving ( Show )
 
 -- | A printer instance for expressions.
 instance Show Expr where
@@ -40,8 +49,8 @@ instance Show Expr where
     EAbs bs e1 -> "\\(" ++ intercalate ", " (map show bs) ++ ") -> " ++ show e1
     EApp e1 es -> "(" ++ show e1 ++ ")" ++ "(" ++ intercalate ", " (map show es) ++ ")"
     EIf e1 e2 e3 -> "if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3
-    EUnBuiltin _ -> "<built-in>"
-    EBinBuiltin _ -> "<built-in>"
+    EUnBuiltin _ x _ -> x
+    EBinBuiltin _ x _ -> x
 
 -- | Proposition syntax
 data Prop = PTrue deriving (Show)
@@ -55,7 +64,7 @@ data QType =
 -- | Ground type syntax.
 data CType =
     CTBool
-  | CTInt
+  | CTI32
   | CTArrow [CType] CType
   | CTVar   TypeName
   deriving (Show)
@@ -100,7 +109,7 @@ areStructurallyEqualQType t1 t2 = case (t1,t2) of
 areStructurallyEqualCType :: CType -> CType -> Bool
 areStructurallyEqualCType t1 t2 = case (t1,t2) of
   (CTBool, CTBool)         -> True
-  (CTInt,  CTInt)          -> True
+  (CTI32,  CTI32)          -> True
   (CTArrow src_t1 tgt_t1, CTArrow src_t2 tgt_t2) ->
     let
       same_lengths = length src_t1 == length src_t2

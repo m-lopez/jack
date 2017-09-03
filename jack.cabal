@@ -15,20 +15,33 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  other-modules:       BuiltIns
+  other-modules:       Builtins
                        Context
                        Evaluator
                        Expressions
-                       Parser
                        Elaboration
                        Util.DebugOr
                        Repl.Repl
                        Repl.Commands
                        Repl.State
-  exposed-modules:     Repl
+                       Ast.Parser
+                       Driver.Ir
+                       Driver.Options
+                       CodeGen.LLVM.Graph
+                       CodeGen.LLVM.Prep
+                       CodeGen.LLVM.Ast
+                       CodeGen.LLVM.Transformer
+  exposed-modules:     Repl Driver.Driver
   build-depends:       parsec
                        , monad-loops
                        , base >= 4.7 && < 5
+                       , cmdargs
+                       , directory
+                       , containers >= 0.4
+                       , llvm-hs-pure >= 4.1
+                       , llvm-hs >= 4.1
+                       , mtl >= 2.2
+                       , bytestring >= 0.10
   default-language:    Haskell2010
 
 executable jack-exe
@@ -53,7 +66,7 @@ test-suite jack-test
                        , HUnit
                        , jack
   other-modules:       BuiltIns Context EvaluatorSpec Evaluator Expressions
-                       Parser ParserSpec Elaboration ElaborationSpec
+                       Ast.Parser ParserSpec Elaboration ElaborationSpec
                        Util.DebugOr
   ghc-options:         -Werror
                        -Wall
