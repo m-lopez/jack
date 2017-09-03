@@ -19,12 +19,12 @@ library
                        Context
                        Evaluator
                        Expressions
-                       Parser
                        Elaboration
                        Util.DebugOr
                        Repl.Repl
                        Repl.Commands
                        Repl.State
+                       Ast.Parser
   exposed-modules:     Repl
   build-depends:       parsec
                        , monad-loops

@@ -17,7 +17,7 @@ import Expressions ( QType, ExprName, Expr, ExprName(ExprName) )
 import Util.DebugOr ( DebugOr, showUnderlying )
 import Data.List ( dropWhile, dropWhileEnd, stripPrefix )
 import Data.Char ( isSpace )
-import Parser ( Ast(..), replParse )
+import Ast.Parser ( Ast(..), replParse )
 import Elaboration ( synthExpr )
 import Data.Maybe ( fromMaybe )
 

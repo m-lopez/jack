@@ -16,7 +16,7 @@ module Elaboration (
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
 
-import Parser (Ast(..), AstName(AstName))
+import Ast.Parser (Ast(..), AstName(AstName))
 import Util.DebugOr (
   DebugOr,
   onlySuccessful,
@@ -183,7 +183,7 @@ synthExpr ctx p = case p of
   ALitBool b  ->
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   ->
-    return (ELitInt i, Unquantified CTInt)
+    return (ELitInt $ toInteger i, Unquantified CTInt)
   AName px -> do
     viable_var <- lookupVar px ctx
     requireSingleton viable_var p
@@ -218,7 +218,7 @@ checkExpr ctx p ret_t = case p of
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   -> do
     requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTInt)) "need better err msg"
-    return (ELitInt i, Unquantified CTInt)
+    return (ELitInt $ toInteger i, Unquantified CTInt)
   AName px -> do
     viable_func <- lookupVar px ctx
     selectByType ret_t viable_func
@@ -259,10 +259,6 @@ requireNotDefined ctx x t = fromDebugOr b failIfRedefine (const sure)
 -- | Type check a top-level declaration of definition.
 checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Maybe Expr)
 checkTopLevelBinding ctx p = case p of
-  ADecl x_p t_p -> do
-    t <- checkType ctx t_p
-    let x = toExprName x_p
-    return (x, t, Nothing)
   ADef x_p t_p e_p -> do
     t <- checkType ctx t_p
     let x = toExprName x_p
