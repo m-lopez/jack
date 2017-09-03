@@ -53,7 +53,7 @@ test-suite jack-test
                        , HUnit
                        , jack
   other-modules:       BuiltIns Context EvaluatorSpec Evaluator Expressions
-                       Parser ParserSpec Elaboration ElaborationSpec
+                       Ast.Parser ParserSpec Elaboration ElaborationSpec
                        Util.DebugOr
   ghc-options:         -Werror
                        -Wall
