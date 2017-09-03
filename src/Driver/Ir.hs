@@ -11,22 +11,21 @@ module Driver.Ir ( writeIr ) where
 
 import qualified Driver.Options as Options ( Stage(..) )
 import Ast.Parser ( parseModule )
-import Elaboration ( elabModule )
-import Util.DebugOr ( DebugOr, fromDebugOr )
-import System.Directory ( doesFileExist )
 import Builtins ( builtinsCtx )
-import Expressions (TlExpr)
+import CodeGen.LLVM.Transformer ( toReadableLlvmIr )
 import Context ( Ctx )
+import Elaboration ( elabModule )
+import Expressions (TlExpr)
+import System.Directory ( doesFileExist )
+import Util.DebugOr ( DebugOr, fromDebugOr )
 
 
 
 elabSource :: String -> DebugOr [TlExpr]
 elabSource src = fst <$> (parseModule src >>= elabModule builtinsCtx)
 
-{-
 toLlvmIrFromSource :: String -> DebugOr (IO String)
-toLlvmIrFromSource src = elabSource src >>= toLlvmIr
--}
+toLlvmIrFromSource src = elabSource src >>= toReadableLlvmIr
 
 writeOrErr :: DebugOr String -> FilePath -> IO ()
 writeOrErr sDbg o = fromDebugOr sDbg writeOut showErr
@@ -44,7 +43,7 @@ execStage :: Options.Stage -> String -> FilePath -> IO ()
 execStage s src = case s of
   Options.Ast  -> writeOrErr (show <$> parseModule src)
   Options.Elab -> writeOrErr (show <$> elabSource src)
-  Options.Llvm -> \x -> putStrLn "error: llvm not yet supported" -- writeEffectfulOrErr (toLlvmIrFromSource src)
+  Options.Llvm -> writeEffectfulOrErr (toLlvmIrFromSource src)
 
 
 writeIr :: Options.Stage -> FilePath -> FilePath -> IO ()
