@@ -15,16 +15,23 @@ module Context (
     declare,
     varValue, varName, varType,
     lookupSignature,
-    addOrReplaceBinding ) where
+    addOrReplaceBinding,
+    addBinding,
+    isDef ) where
 
 import Data.List ( find )
-import Util.DebugOr ( DebugOr, justOrErr, mkSuccess, isSuccess )
+import Util.DebugOr ( DebugOr, justOrErr, mkSuccess, isSuccess, fromDebugOr )
 import Expressions ( Expr, ExprName, QType, areStructurallyEqualQType )
 
 data Binding = BVar {
   varName  :: ExprName,
   varType  :: QType,
   varValue :: Maybe Expr } -- todo: should there be another type of binding instead?
+
+isDef :: Binding -> Bool
+isDef b = case b of
+  BVar _ _ (Just _) -> True
+  BVar _ _ _ -> False
 
 newtype Ctx = Ctx [Binding]
 
@@ -62,6 +69,22 @@ addOrReplaceBinding b@(BVar x t (Just _)) ctx@(Ctx bindings) =
     else mkSuccess $ Ctx $ b : bindings
   where
     sameSig (BVar y u _) = x == y && areStructurallyEqualQType t u
+
+addBinding :: Binding -> Ctx -> DebugOr Ctx
+addBinding b@(BVar x t Nothing) ctx@(Ctx bindings) =
+  if isSuccess $ lookupSignature ctx x t
+    then mkSuccess ctx
+    else mkSuccess $ Ctx $ b : bindings
+addBinding b@(BVar x t (Just _)) ctx@(Ctx bindings) =
+  let res = lookupSignature ctx x t in
+    if isSuccessAndDef res
+      then fail $ "redefining top level definition of `" ++ show x ++ ": " ++ show t ++ "`"
+      else if isSuccess res
+        then mkSuccess $ Ctx $ replaceFirst sameSig b bindings
+        else mkSuccess $ Ctx $ b : bindings
+  where
+    sameSig (BVar y u _) = x == y && areStructurallyEqualQType t u
+    isSuccessAndDef b = fromDebugOr b isDef (const False)
 
 replaceFirst :: (a -> Bool) -> a -> [a] -> [a]
 replaceFirst p a as = case as of
