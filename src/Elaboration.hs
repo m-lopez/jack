@@ -146,7 +146,7 @@ checkType ctx p = Unquantified <$> checkUnquantType ctx p
 checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
   ATypeBool -> mkSuccess CTBool
-  ATypeInt -> mkSuccess CTInt
+  ATypeInt -> mkSuccess CTI32
   AArrow ps p' -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p'
@@ -183,7 +183,7 @@ synthExpr ctx p = case p of
   ALitBool b  ->
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   ->
-    return (ELitInt $ toInteger i, Unquantified CTInt)
+    return (ELitInt i, Unquantified CTI32)
   AName px -> do
     viable_var <- lookupVar px ctx
     requireSingleton viable_var p
@@ -217,8 +217,8 @@ checkExpr ctx p ret_t = case p of
     requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTBool)) "need better err msg"
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTInt)) "need better err msg"
-    return (ELitInt $ toInteger i, Unquantified CTInt)
+    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTI32)) "need better err msg"
+    return (ELitInt i, Unquantified CTI32)
   AName px -> do
     viable_func <- lookupVar px ctx
     selectByType ret_t viable_func
