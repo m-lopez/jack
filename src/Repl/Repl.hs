@@ -54,10 +54,9 @@ showDef (ExprName s, t, e) =
 -- | Attempt to evaluate a top-level definition.
 evalTopLevelBinding :: CompilerState -> Ast -> DebugOr (CompilerState, String)
 evalTopLevelBinding state ast = do
-  (x, t, e_maybe) <- checkTopLevelBinding ctx ast
-  case evalExpr ctx <$> e_maybe of
-    Just v -> (\v' -> (CompilerState $ extendVar x t v' ctx, showDef x t v')) <$> v
-    Nothing -> return (CompilerState $ declare x t ctx, showDecl x t)
+  (x, t, e) <- checkTopLevelBinding ctx ast
+  v <- evalExpr ctx e
+  return (CompilerState $ extendVar x t v ctx, showDef x t v)
   where
     ctx = getCtx state
     showDef x t v = "defined " ++ show x ++ ": " ++ show t ++ " := " ++ show v

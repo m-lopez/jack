@@ -36,7 +36,7 @@ data Expr =
 
 -- | A top-level expression.
 data TlExpr =
-  TlDef String CType Expr |
+  TlDef String QType Expr |
   TlFuncDef String [(String, CType)] CType Expr
   deriving ( Show )
 
