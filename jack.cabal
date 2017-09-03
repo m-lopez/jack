@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  other-modules:       BuiltIns
+  other-modules:       Builtins
                        Context
                        Evaluator
                        Expressions

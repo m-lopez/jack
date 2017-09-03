@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module BuiltIns ( builtinsCtx ) where
+module Builtins ( builtinsCtx ) where
 
 import Expressions (
   ExprName(..),

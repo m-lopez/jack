@@ -26,7 +26,7 @@ import Util.DebugOr (
   isSuccess,
   fromDebug )
 import Evaluator ( evalExpr )
-import BuiltIns ( builtinsCtx )
+import Builtins ( builtinsCtx )
 import Data.Char ( isSpace, isAlphaNum )
 import Data.List ( stripPrefix )
 import Repl.State ( CompilerState(..) )
