@@ -67,10 +67,10 @@ evalApp ctx e es = do
     -- FIXME: Add value check here.
     f  <- evalExpr ctx e
     case f of
-      EAbs xs e'     -> evalLambdaApp ctx e' xs vs
-      EUnBuiltin f'  -> evalUnaryBuiltin f' vs
-      EBinBuiltin f' -> evalBinaryBuiltin f' vs
-      _              -> fail $ "callee " ++ show f ++ " is not callable"
+      EAbs xs e'         -> evalLambdaApp ctx e' xs vs
+      EUnBuiltin _ _ f'  -> evalUnaryBuiltin f' vs
+      EBinBuiltin _ _ f' -> evalBinaryBuiltin f' vs
+      _                  -> fail $ "callee " ++ show f ++ " is not callable"
 
 evalLambdaApp :: Ctx -> Expr -> [(ExprName, CType)] -> [Expr] -> DebugOr Expr
 evalLambdaApp ctx e xs vs = do

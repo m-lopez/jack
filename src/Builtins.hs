@@ -1,5 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
-
+{-|
+Module      : Builtins
+Description : Built-in components of the langauge and the intial context.
+Copyright   : (c) Michael Lopez, 2017
+License     : MIT
+Maintainer  : m-lopez (github)
+Stability   : unstable
+Portability : non-portable
+-}
 module Builtins ( builtinsCtx ) where
 
 import Expressions (
@@ -10,14 +18,13 @@ import Expressions (
 import Context ( Ctx(Ctx), Binding(BVar) )
 import Util.DebugOr ( DebugOr, mkSuccess )
 
-
 -- | Builders for unary intrinsics.
 class AsUnaryIntrinsicData a where
-  asUnaryIntrinsic :: String -> a -> Binding
+  asUnaryIntrinsic :: String -> String -> a -> Binding
 
 -- | A builder for integer transformation intrinsics.
 instance AsUnaryIntrinsicData (Integer -> Integer) where
-  asUnaryIntrinsic sym op = BVar (ExprName sym) t (Just $ EUnBuiltin f)
+  asUnaryIntrinsic sym id op = BVar (ExprName sym) t (Just $ EUnBuiltin sym id f)
     where
       t = Unquantified $ CTArrow [ CTInt ] CTInt
       f :: Expr -> DebugOr Expr
@@ -27,7 +34,7 @@ instance AsUnaryIntrinsicData (Integer -> Integer) where
 
 -- | A builder for Boolean transformation intrinsics.
 instance AsUnaryIntrinsicData (Bool -> Bool) where
-  asUnaryIntrinsic sym op = BVar (ExprName sym) t (Just $ EUnBuiltin f)
+  asUnaryIntrinsic sym id op = BVar (ExprName sym) t (Just $ EUnBuiltin sym id f)
     where
       t = Unquantified $ CTArrow [ CTBool ] CTBool
       f arg = case arg of
@@ -36,11 +43,11 @@ instance AsUnaryIntrinsicData (Bool -> Bool) where
 
 -- | Builders for binary intrinsics.
 class AsBinaryIntrinsicData a where
-  asBinaryIntrinsic :: String -> a -> Binding
+  asBinaryIntrinsic :: String -> String -> a -> Binding
 
 -- | A binary operation binding builder. 
 instance AsBinaryIntrinsicData (Integer -> Integer -> Integer) where
-  asBinaryIntrinsic sym op = BVar (ExprName sym) t (Just $ EBinBuiltin f)
+  asBinaryIntrinsic sym id op = BVar (ExprName sym) t (Just $ EBinBuiltin sym id f)
     where
       t = Unquantified $ CTArrow [ CTInt, CTInt ] CTInt
       f args = case args of
@@ -49,7 +56,7 @@ instance AsBinaryIntrinsicData (Integer -> Integer -> Integer) where
 
 -- | A binary integer predicate binding builder.
 instance AsBinaryIntrinsicData (Integer -> Integer -> Bool) where
-  asBinaryIntrinsic sym op = BVar (ExprName sym) t (Just $ EBinBuiltin f)
+  asBinaryIntrinsic sym id op = BVar (ExprName sym) t (Just $ EBinBuiltin sym id f)
     where
       t = Unquantified $ CTArrow [ CTInt, CTInt ] CTBool
       f args = case args of
@@ -58,7 +65,7 @@ instance AsBinaryIntrinsicData (Integer -> Integer -> Bool) where
 
 -- | A binary Boolean predicate binding builder.
 instance AsBinaryIntrinsicData (Bool -> Bool -> Bool) where
-  asBinaryIntrinsic sym op = BVar (ExprName sym) t (Just $ EBinBuiltin f)
+  asBinaryIntrinsic sym id op = BVar (ExprName sym) t (Just $ EBinBuiltin sym id f)
     where
       t = Unquantified $ CTArrow [ CTInt, CTInt ] CTBool
       f args = case args of
@@ -68,18 +75,19 @@ instance AsBinaryIntrinsicData (Bool -> Bool -> Bool) where
 -- | Builtin context.
 builtinsCtx :: Ctx
 builtinsCtx = Ctx [
-  asUnaryIntrinsic  "-"   ((\x -> -x) :: Integer -> Integer),
-  asUnaryIntrinsic  "not" not, 
-  asBinaryIntrinsic "+"   ((+)  :: Integer -> Integer -> Integer),
-  asBinaryIntrinsic "-"   ((-)  :: Integer -> Integer -> Integer),
-  asBinaryIntrinsic "*"   ((*)  :: Integer -> Integer -> Integer),
-  asBinaryIntrinsic "/"   (div  :: Integer -> Integer -> Integer),
-  asBinaryIntrinsic "rem" (rem  :: Integer -> Integer -> Integer),
-  asBinaryIntrinsic "or"  (||),
-  asBinaryIntrinsic "and" (&&),
-  asBinaryIntrinsic "="   ((==) :: Integer -> Integer -> Bool),
-  asBinaryIntrinsic "<>"  ((/=) :: Integer -> Integer -> Bool),
-  asBinaryIntrinsic "<"   ((<)  :: Integer -> Integer -> Bool),
-  asBinaryIntrinsic "<="  ((<=) :: Integer -> Integer -> Bool),
-  asBinaryIntrinsic ">"   ((>)  :: Integer -> Integer -> Bool),
-  asBinaryIntrinsic ">="  ((>=) :: Integer -> Integer -> Bool) ]
+  asUnaryIntrinsic  "-"   "-_I32"   ((\x -> -x) :: Integer -> Integer),
+  asUnaryIntrinsic  "not" "not"     not,
+  asBinaryIntrinsic "+"   "+_I32"   ((+)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "-"   "-_I32"   ((-)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "*"   "*_I32"   ((*)  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "/"   "/_I32"   (div  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "rem" "rem_I32" (rem  :: Integer -> Integer -> Integer),
+  asBinaryIntrinsic "or"  "or"      (||),
+  asBinaryIntrinsic "and" "and"     (&&),
+  asBinaryIntrinsic "="   "=_I32"   ((==) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<>"  "<>_I32"  ((/=) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<"   "<_I32"   ((<)  :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic "<="  "<=_I32"  ((<=) :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic ">"   ">_I32"   ((>)  :: Integer -> Integer -> Bool),
+  asBinaryIntrinsic ">="  ">=_I32"  ((>=) :: Integer -> Integer -> Bool) ]
+

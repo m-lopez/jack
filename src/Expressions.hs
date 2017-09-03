@@ -28,8 +28,8 @@ data Expr =
   | EAbs        [(ExprName, CType)] Expr
   | EApp        Expr [Expr]
   | EIf         Expr Expr Expr
-  | EUnBuiltin  (Expr -> DebugOr Expr)
-  | EBinBuiltin ((Expr, Expr) -> DebugOr Expr)
+  | EUnBuiltin  String String (Expr -> DebugOr Expr)
+  | EBinBuiltin String String((Expr, Expr) -> DebugOr Expr)
 
 -- | A printer instance for expressions.
 instance Show Expr where
@@ -40,8 +40,8 @@ instance Show Expr where
     EAbs bs e1 -> "\\(" ++ intercalate ", " (map show bs) ++ ") -> " ++ show e1
     EApp e1 es -> "(" ++ show e1 ++ ")" ++ "(" ++ intercalate ", " (map show es) ++ ")"
     EIf e1 e2 e3 -> "if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3
-    EUnBuiltin _ -> "<built-in>"
-    EBinBuiltin _ -> "<built-in>"
+    EUnBuiltin _ x _ -> x
+    EBinBuiltin _ x _ -> x
 
 -- | Proposition syntax
 data Prop = PTrue deriving (Show)
