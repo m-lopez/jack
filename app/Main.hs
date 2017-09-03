@@ -1,6 +1,7 @@
 module Main where
 
-import Repl ( repl )
+import Driver.Driver
 
 main :: IO ()
-main = repl
+main = exec
+
