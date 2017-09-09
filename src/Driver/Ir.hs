@@ -10,7 +10,7 @@ Portability : non-portable
 module Driver.Ir ( writeIr ) where
 
 import qualified Driver.Options as Options ( Stage(..) )
-import Ast.Parser ( parseModule )
+import Syntax.Parser ( parseModule )
 import Builtins ( builtinsCtx )
 import CodeGen.LLVM.Transformer ( toReadableLlvmIr )
 import Context ( Ctx )

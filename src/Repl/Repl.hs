@@ -9,7 +9,7 @@ Portability : non-portable
 -}
 module Repl.Repl ( repl ) where
 
-import Ast.Parser ( Ast(..), replParse )
+import Syntax.Parser ( Ast(..), replParse )
 import Expressions ( QType(..), Expr, ExprName(ExprName) )
 import Context (
   Ctx(..),

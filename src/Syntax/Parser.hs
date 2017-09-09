@@ -1,17 +1,13 @@
 {-|
-Module      : Ast.Parser
+Module      : Syntax.Parser
 Description : Types and operations for managing the elaboration context.
 Copyright   : (c) Michael Lopez, 2017
 License     : MIT
 Maintainer  : m-lopez (github)
 Stability   : unstable
 Portability : non-portable
-
-Todo:
-  The Ast should be pulled out of this and put into it's own file.
-  Just use Parsec lexing facilities.
 -}
-module Ast.Parser (
+module Syntax.Parser (
   Ast(..),
   AstName(..),
   replParse,

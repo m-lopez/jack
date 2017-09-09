@@ -17,7 +17,7 @@ module Elaboration (
 --  TODOS
 --    Add better debug support. Need locus information from the parser.
 
-import Ast.Parser (Ast(..), AstName(AstName))
+import Syntax.Parser (Ast(..), AstName(AstName))
 import Util.DebugOr (
   DebugOr,
   onlySuccessful,
