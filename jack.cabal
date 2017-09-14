@@ -25,6 +25,7 @@ library
                        Repl.Commands
                        Repl.State
                        Syntax.Parser
+                       Syntax.Ast
                        Driver.Ir
                        Driver.Options
                        CodeGen.LLVM.Graph

@@ -17,7 +17,8 @@ module Context (
     lookupSignature,
     addOrReplaceBinding,
     addBinding,
-    isDef ) where
+    isDef,
+    unionCtx ) where
 
 import Data.List ( find )
 import Util.DebugOr ( DebugOr, justOrErr, mkSuccess, isSuccess, fromDebugOr )
@@ -42,6 +43,9 @@ extendVars :: [(ExprName, QType, Maybe Expr)] -> Ctx -> Ctx
 extendVars xts (Ctx ctx) = Ctx (new_bindings ++ ctx)
   where
     new_bindings = map (\(x1, x2, x3) -> BVar x1 x2 x3) xts
+
+unionCtx :: Ctx -> Ctx -> Ctx
+unionCtx (Ctx bs1) (Ctx bs2) = Ctx $ bs1 ++ bs2
 
 -- | Add a binding to the context with no initial value.
 declare :: ExprName -> QType -> Ctx -> Ctx

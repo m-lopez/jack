@@ -22,7 +22,7 @@ import Util.DebugOr ( DebugOr, fromDebugOr )
 
 
 elabSource :: String -> DebugOr [TlExpr]
-elabSource src = fst <$> (parseModule src >>= elabModule builtinsCtx)
+elabSource src = parseModule src >>= elabModule builtinsCtx
 
 toLlvmIrFromSource :: String -> DebugOr (IO String)
 toLlvmIrFromSource src = elabSource src >>= toReadableLlvmIr

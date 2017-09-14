@@ -9,7 +9,8 @@ Portability : non-portable
 -}
 module Repl.Repl ( repl ) where
 
-import Syntax.Parser ( Ast(..), replParse )
+import Syntax.Ast ( Ast(..) )
+import Syntax.Parser ( replParse )
 import Expressions ( QType(..), Expr, ExprName(ExprName) )
 import Context (
   Ctx(..),
@@ -74,7 +75,7 @@ evalExpression state ast = showUnderlying v'
 -- | True iff the AST is a top-level binding.
 isTopLevelBinding :: Ast -> Bool
 isTopLevelBinding p = case p of
-  ADef { } -> True
+  -- ADef { } -> True
   _ -> False
 
 -- | Attempt to apply Toaster's evaluation rules to compute a value.

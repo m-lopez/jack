@@ -14,10 +14,10 @@ module Elaboration (
   checkTopLevelBinding,
   elabModule ) where
 
---  TODOS
---    Add better debug support. Need locus information from the parser.
-
-import Syntax.Parser (Ast(..), AstName(AstName))
+import Syntax.Ast (
+  Ast(..), Module(..), LocalContext(..), LocalConstantContext(..),
+  TopLevel(..), ConstantParameter(..), BuiltinType(..) )
+import qualified Syntax.Ast as A
 import Util.DebugOr (
   DebugOr,
   onlySuccessful,
@@ -39,13 +39,71 @@ import Context (
   extendVars,
   lookupSignature,
   addBinding,
-  isDef )
+  isDef, unionCtx )
+import Data.Maybe ( isJust )
+import Data.List ( find )
 
 
+-- | Elaboorate a module.
+elabModule :: Ctx -> A.Module -> DebugOr [TlExpr]
+elabModule externCtx (A.Module tls) = do
+  localCtx <- elabDeclarations externCtx tls
+  requireUniqueDecls localCtx
+  let ctx = externCtx `unionCtx` localCtx
+  elabTops ctx tls
+
+-- | Report a message if the reflaxive, symmetric relation is satisfied by any
+-- two distinct elements in the list.
+requireUnrelated :: [a] -> (a -> a -> Bool) -> (a -> a -> String) -> DebugOr ()
+requireUnrelated xs r mkMsg = case xs of
+  [] -> mkSuccess ()
+  x:xs' -> do
+    findRelation x xs r mkMsg
+    requireUnrelated xs' r mkMsg
+  where
+    findRelation y ys r mkMsg = case find (r y) ys of
+      Just y' -> fail $ mkMsg y y'
+      Nothing -> mkSuccess ()
+
+-- | Fail if there is more than one declaration for two types.
+requireUniqueDecls :: Ctx -> DebugOr ()
+requireUniqueDecls (Ctx bs) = requireUnrelated
+  bs
+  (\(BVar (ExprName x1) qt1 _) (BVar (ExprName x2) qt2 _) -> x1 == x2 && areStructurallyEqualQType qt1 qt2)
+  (\(BVar (ExprName x1) qt1 _) _ -> "found two bindngs for `" ++ x1 ++ ": " ++ show qt1 ++ "`")
+
+-- | Populate the top-level context with .
+elabDeclarations :: Ctx -> [A.TopLevel] -> DebugOr Ctx
+elabDeclarations ctx tls = Ctx <$> traverse (elabDecl ctx) tls
+  where
+    elabDecl ctx' tl = case tl of
+      A.ConstantDef x _ tp _ -> do
+        t <- checkType ctx' tp
+        return $ BVar (ExprName x) t Nothing
+      _ -> fail "unsupported"
+
+-- | Elaborate top-levels.
+elabTops :: Ctx -> [A.TopLevel] -> DebugOr [TlExpr]
+elabTops ctx = mapM (elabTop ctx)
+  where
+    elabTop ctx' ast' = case ast' of
+      A.ConstantDef x params t e -> elabConstantDef ctx' x params t e
+      _ -> fail "unsupported-001"
+
+-- | Elaborate a constant definition.
+elabConstantDef :: Ctx -> String -> A.LocalContext -> A.Ast -> A.Ast -> DebugOr TlExpr
+elabConstantDef ctx x l t_p e_p = do
+  let LocalContext cparams cst params = l
+  if isJust cparams || isJust cst || isJust params
+    then fail "unsupported-002"
+    else do
+      t <- checkType ctx t_p
+      (e, _) <- checkExpr ctx e_p t
+      return $ TlDef x t e
 
 -- | A helper function to convert AST symbols to expression symbols.
-toExprName :: AstName -> ExprName
-toExprName (AstName n) = ExprName n
+toExprName :: String -> ExprName
+toExprName = ExprName
 
 -- | The type of an overload set.
 newtype OverloadSet = OverloadSet { interps :: [(Expr, QType)] }
@@ -53,17 +111,12 @@ newtype OverloadSet = OverloadSet { interps :: [(Expr, QType)] }
 -- Print just the immediate node.
 summerizeForm :: Ast -> String
 summerizeForm ast = case ast of
-  ALitBool b -> show b
-  ALitInt n  -> show n
   AArrow _ _  -> "_ -> _"
-  AName (AstName s) -> "`" ++ s ++ "`"
+  AName     s -> "`" ++ (head s) ++ "`"
   AAbs _ _    -> "\\(x:t,...) -> e"
   AApp _ _    -> "e e"
   AIf _ _ _   -> "if b then e else e"
-  ADef _ _ _  -> "def x:t := e"
   _           -> "unrecognized AST"
-
-
 
 --------------------------------------------------------------------------------
 -- Requirement combinators.
@@ -114,7 +167,7 @@ viable ctx f t ps = do
 resolve :: Ctx -> Ast -> [Ast] -> DebugOr OverloadSet
 resolve ctx p ps = case p of
   AName n -> do
-    cands   <- lookupVar n ctx                          -- Computes a candidate set
+    cands   <- lookupVar (head n) ctx                          -- Computes a candidate set
     viables <- onlySuccessful $ map (\(f, t) -> viable ctx f t ps) $ interps cands  -- Computes viable functions
     _       <- requireOrElse (not $ null viables) ("no valid interpretations for application" ++ show p)
     return $ OverloadSet viables
@@ -133,8 +186,8 @@ resolve ctx p ps = case p of
 --  This system is responsible for querying the context for bindings.
 
 -- Lookup an expression variable.
-lookupVar :: AstName -> Ctx -> DebugOr OverloadSet
-lookupVar (AstName n) (Ctx bindings) =
+lookupVar :: String -> Ctx -> DebugOr OverloadSet
+lookupVar n (Ctx bindings) =
   let
     var_binding_has_name v b = case b of BVar v' _ _ -> v == v'
     overloads = filter (var_binding_has_name $ ExprName n) bindings
@@ -159,23 +212,32 @@ checkType ctx p = Unquantified <$> checkUnquantType ctx p
 
 checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
-  ATypeBool -> mkSuccess CTBool
-  ATypeInt -> mkSuccess CTI32
+  ABuiltinType bt -> checkBuiltinType bt
+  ARecType bs -> checkRecType ctx bs
   AArrow ps p' -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p'
     return $ CTArrow src_ts tgt_t
-  ARecT _ -> fail "sorry, support for record types has not been implemented"
-  ALitBool _ -> fail_here
-  ALitInt _   -> fail_here
-  AName xt -> let (AstName n) = xt in return $ CTVar $ TypeName n
-  AAbs _ _ -> fail_here
-  AApp _ _ -> fail_here
-  AIf _ _ _ -> fail_here
-  ACoerce _ _ -> fail_here
-  AInit _ -> fail_here
-  ADef _ _ _ -> fail_here
+  AName xt -> let n = head xt in return $ CTVar $ TypeName n
+  _ -> fail_here
   where fail_here = fail $ "expected unquantified type; got " ++ summerizeForm p
+
+checkBuiltinType :: BuiltinType -> DebugOr CType
+checkBuiltinType bt = case bt of
+  U8 -> fail "unsupported"
+  U16 -> fail "unsupported"
+  U32 -> fail "unsupported"
+  U64 -> fail "unsupported"
+  I8 -> fail "unsupported"
+  I16 -> fail "unsupported"
+  I32 -> mkSuccess CTI32
+  I64 -> fail "unsupported"
+  Bool -> mkSuccess CTBool
+  F32 -> fail "unsupported"
+  F64 -> fail "unsupported"
+
+checkRecType :: Ctx -> [(String, Ast)] -> DebugOr CType
+checkRecType _ = fail "nothing"
 
 checkUnquantTypes :: Ctx -> [Ast] -> DebugOr [CType]
 checkUnquantTypes ctx = traverse (checkUnquantType ctx)
@@ -194,12 +256,12 @@ checkUnquantTypes ctx = traverse (checkUnquantType ctx)
 -- Synthesize a typed expression from an AST.
 synthExpr :: Ctx -> Ast -> DebugOr (Expr, QType)
 synthExpr ctx p = case p of
-  ALitBool b  ->
+  {-ALitBool b  ->
     return (ELitBool b, Unquantified CTBool)
   ALitInt i   ->
-    return (ELitInt i, Unquantified CTI32)
+    return (ELitInt i, Unquantified CTI32) -}
   AName px -> do
-    viable_var <- lookupVar px ctx
+    viable_var <- lookupVar (head px) ctx
     requireSingleton viable_var p
   AAbs bindings p' ->
     let
@@ -221,20 +283,37 @@ synthExpr ctx p = case p of
     return (EIf e1 e2 e3, t2)
   _ -> fail $ "expected an expression to synthesize; got a " ++ summerizeForm p
 
--- synthExprs :: Ctx -> [Ast] -> DebugOr [(Expr, QType)]
--- synthExprs ctx = traverse (synthExpr ctx)
+requireTypeEq :: QType -> QType -> DebugOr ()
+requireTypeEq t u = if areStructurallyEqualQType t u
+  then return ()
+  else fail $ "type `" ++ show t ++ "` is not equal to `" ++ show u ++ "`"
+
+fitsIn32 :: Integer -> Bool
+fitsIn32 i = i > 2147483647 || i < -2147483648
+
+interpret_literal_integer :: Integer -> QType -> DebugOr Expr
+interpret_literal_integer i qt = case qt of
+  (Unquantified CTI32) -> if fitsIn32 i
+    then mkSuccess $ ELitInt $ fromInteger i
+    else fail $ "integer `" ++ show i ++ "` cannot fit into an unsigned 32-bit representation"
+  _ -> fail $ "cannot convert integer `" ++ show i ++ "` to type `" ++ show qt ++ "`"
+
+interpret_literal_double _ _ = fail "unsupported"
 
 -- Derive a type checking judgment.
 checkExpr :: Ctx -> Ast -> QType -> DebugOr (Expr, QType)
 checkExpr ctx p ret_t = case p of
-  ALitBool b  -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTBool)) "need better err msg"
+  ALitBoolean b -> do
+    requireTypeEq ret_t (Unquantified CTBool)
     return (ELitBool b, Unquantified CTBool)
-  ALitInt i   -> do
-    requireOrElse (areStructurallyEqualQType ret_t (Unquantified CTI32)) "need better err msg"
-    return (ELitInt i, Unquantified CTI32)
+  ALitInteger i -> do
+    e <- interpret_literal_integer i ret_t
+    return (e, ret_t)
+  ALitDouble d -> do
+    _ <- interpret_literal_double d ret_t
+    fail "unsupported"
   AName px -> do
-    viable_func <- lookupVar px ctx
+    viable_func <- lookupVar (head px) ctx
     selectByType ret_t viable_func
   AAbs bindings p' ->
     let
@@ -270,29 +349,12 @@ requireNotDefined ctx x t = if fromDebugOr (lookupSignature ctx x t) isDef (cons
 -- FIXME: Why does this not return a binding?
 checkTopLevelBinding :: Ctx -> Ast -> DebugOr (ExprName, QType, Expr)
 checkTopLevelBinding ctx p = case p of
-  ADef x_p t_p e_p -> do
+  {-ADef x_p t_p e_p -> do
     t <- checkType ctx t_p
     let x = toExprName x_p
     _ <- requireNotDefined ctx x t
     (e, _) <- checkExpr ctx e_p t
-    return (x, t, e)
+    return (x, t, e)-}
   _ -> fail $ "expected a binding; got " ++ show p
 
--- | Elaborate a module. The result is a well-typed program and a context with
--- the declarations and definitions contained in the module.
--- FIXME: This is single-pass semantics. The first run should be declaration
--- checking only. Then that context should be used to type check. This is very
--- difficult since type evaluation needs to be checked.
-elabModule :: Ctx -> [Ast] -> DebugOr ([TlExpr], Ctx)
-elabModule ctx = foldl f init
-  where
-    f :: DebugOr ([TlExpr], Ctx) -> Ast -> DebugOr ([TlExpr], Ctx)
-    f prev ast = prev >>= g ast
-    init :: DebugOr ([TlExpr], Ctx)
-    init = mkSuccess ([], ctx)
-    g :: Ast -> ([TlExpr], Ctx) -> DebugOr ([TlExpr], Ctx)
-    g ast' (es, ctx') = do
-      (ExprName x, t, init_maybe) <- checkTopLevelBinding ctx' ast'
-      ctx'' <- addBinding (BVar (ExprName x) t (Just init_maybe)) ctx'
-      return (TlDef x t init_maybe : es, ctx'')
 
