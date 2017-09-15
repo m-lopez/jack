@@ -32,7 +32,11 @@ import Text.Parsec.Token (
   GenTokenParser )
 import qualified Text.Parsec.Token as T
 import Data.Int ( Int32(..) )
-
+{- Notes
+  One of the reasons that this parser is so complicated is that lexing logic is
+  mingled with parsing logic. Not sure how to preserve the good parsec debug
+  information if these phases are separated.
+-}
 
 
 replParse :: String -> DebugOr Ast
@@ -40,7 +44,7 @@ replParse code = case parse rule "REPL parser" code of
   Left x -> fail $ show x
   Right x -> mkSuccess x
   where
-    rule = ast
+    rule = expr
 
 parseModule :: String -> DebugOr Module
 parseModule code = case parse module_ "Module parser" code of
@@ -49,7 +53,8 @@ parseModule code = case parse module_ "Module parser" code of
 
 -- module ;;= [header] { top-level, ";" }
 module_ :: Parser Module
-module_ = Module <$> {-header <*>-} (sepBy toplevel statementTerminal)
+module_ = Module <$> {-header <*>-}
+  (whiteSpace *> (sepBy toplevel $ reservedOp ";")) -- (sepBy toplevel statementTerminal)
 
 statementTerminal :: Parser ()
 statementTerminal = (many1 $ (symbol ";" *> return ()) <|> (endOfLine *> return ())) *> return ()
@@ -89,27 +94,27 @@ propDef :: Parser TopLevel
 propDef = PropDef <$>
   (keyword "prop" *> name) <*>
   localConstantContext <*>
-  (reservedOp ":=" *> ast)
+  (reservedOp ":=" *> prop)
 
 -- constant-definition ::= identifier ":" local-context type ":=" expression
 constantDef :: Parser TopLevel
 constantDef = ConstantDef <$>
   name <*>
-  (symbol ":" *> (return $ LocalContext Nothing Nothing Nothing)) <*>
+  (reservedOp ":" *> (return $ LocalContext Nothing Nothing Nothing)) <*>
   type_ <*>
-  (symbol ":=" *> ast)
+  (symbol ":=" *> expr)
 
 -- local-constant-context ::= [ constant-parameters  ] [ proposition ]
 localConstantContext :: Parser LocalConstantContext
 localConstantContext = LocalConstantContext <$>
   (optionMaybe $ try constantParams) <*>
-  (optionMaybe $ try ast)
+  (optionMaybe $ try prop)
 
 -- local-context ::= [ constant-parameters ] [ proposition ] [ parameters ]
 localContext :: Parser LocalContext
 localContext = LocalContext <$>
   (optionMaybe $ try constantParams) <*>
-  (optionMaybe $ try ast) <*>
+  (optionMaybe $ try prop) <*>
   (optionMaybe $ try parameters)
 
 -- constant-parameters ::= "[" { constant-binding, "," }  "]"
@@ -167,8 +172,11 @@ builtinType = ABuiltinType <$> (
     f32 = try (keyword "F32" *> return F32)
     f64 = try (keyword "F64" *> return F64)
 
-ast :: Parser Ast
-ast = try block <|> let_
+prop :: Parser Ast
+prop = fail "unsupported-01"
+
+expr :: Parser Ast
+expr = let_ <?> "expression"
 
 block :: Parser Ast
 block = ABlock <$> braces (sepBy let_ $ symbol ";")
@@ -181,7 +189,7 @@ let_ = try letRule <|> if_
 if_ :: Parser Ast
 if_ = ifRule <|> binary
   where
-    ifRule = AIf <$> (keyword "if" *> ast) <*> (keyword "then" *> ast) <*> (keyword "else" *> ast)
+    ifRule = AIf <$> (keyword "if" *> expr) <*> (keyword "then" *> expr) <*> (keyword "else" *> expr)
 
 opTable :: [[Operator String () Identity Ast]]
 opTable = [
@@ -222,7 +230,7 @@ arguments :: Parser [Ast]
 arguments = parens exprs <|> call_expr_as_args
   where
     call_expr_as_args  = pure <$> application :: Parser [Ast]
-    exprs = sepBy ast $ symbol ","
+    exprs = sepBy expr $ symbol ","
 
 -- application ::= simple arguments | simple
 application :: Parser Ast
@@ -230,7 +238,7 @@ application = try (AApp <$> simple <*> arguments) <|> simple
 
 -- simple ::= '(' expr ')' | variable | literal
 simple :: Parser Ast
-simple = parens ast <|> identifier <|> literal
+simple = parens expr <|> block <|> identifier <|> literal
 
 literal :: Parser Ast
 literal = try bool <|> try hex <|> try floatingPoint <|> try integer <?> "literal"
@@ -304,7 +312,7 @@ lexDefs = LanguageDef
           , "I32", "I64", "Bool", "F32", "F63", "module"
           ]
     ops = [ "+", "-", "*", "/", "=", "=\\=", "<", "<=", ">", ">=", ":=", "@"
-          , "#", "$", "%", "^", "&", "|", "?"
+          , "#", "$", "%", "^", "&", "|", "?", ";"
           ]
 
 -- lexer :: GenTokenParser s u m
