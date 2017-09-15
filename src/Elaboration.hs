@@ -111,7 +111,7 @@ newtype OverloadSet = OverloadSet { interps :: [(Expr, QType)] }
 -- Print just the immediate node.
 summerizeForm :: Ast -> String
 summerizeForm ast = case ast of
-  AArrow _ _  -> "_ -> _"
+  AArrowType  _ _  -> "_ -> _"
   AName     s -> "`" ++ (head s) ++ "`"
   AAbs _ _    -> "\\(x:t,...) -> e"
   AApp _ _    -> "e e"
@@ -214,7 +214,7 @@ checkUnquantType :: Ctx -> Ast -> DebugOr CType
 checkUnquantType ctx p = case p of
   ABuiltinType bt -> checkBuiltinType bt
   ARecType bs -> checkRecType ctx bs
-  AArrow ps p' -> do
+  AArrowType ps p' -> do
     src_ts <- checkUnquantTypes ctx ps
     tgt_t  <- checkUnquantType ctx p'
     return $ CTArrow src_ts tgt_t
@@ -232,7 +232,7 @@ checkBuiltinType bt = case bt of
   I16 -> fail "unsupported"
   I32 -> mkSuccess CTI32
   I64 -> fail "unsupported"
-  Bool -> mkSuccess CTBool
+  BoolT -> mkSuccess CTBool
   F32 -> fail "unsupported"
   F64 -> fail "unsupported"
 

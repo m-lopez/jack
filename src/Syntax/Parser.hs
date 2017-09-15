@@ -19,8 +19,8 @@ import Control.Applicative ((<*), (*>), (<|>), (<$>))
 import Control.Monad (void)
 import Data.Functor.Identity
 import Text.Parsec (many, try, parse, (<?>), eof )
-import Text.Parsec.Char (oneOf, string, digit, char, letter)
-import Text.Parsec.Combinator ( many1, sepBy, sepBy1, optionMaybe )
+import Text.Parsec.Char ( oneOf, string, digit, char, letter, spaces, endOfLine )
+import Text.Parsec.Combinator ( many1, sepBy, sepBy1, optionMaybe, many1 )
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr (
   buildExpressionParser,
@@ -49,7 +49,10 @@ parseModule code = case parse module_ "Module parser" code of
 
 -- module ;;= [header] { top-level, ";" }
 module_ :: Parser Module
-module_ = Module <$> {-header <*>-} (sepBy toplevel $ symbol ";")
+module_ = Module <$> {-header <*>-} (sepBy toplevel statementTerminal)
+
+statementTerminal :: Parser ()
+statementTerminal = (many1 $ (symbol ";" *> return ()) <|> (endOfLine *> return ())) *> return ()
 
 -- header ::= "module" qualified "(" { identifier, "," }  ")"
 {-header :: Parser (Maybe Header)
@@ -64,8 +67,8 @@ header = optionMaybe $ try header
 toplevel :: Parser TopLevel
 toplevel =
   {-import_ <|>-}
-  typeDef <|>
-  propDef <|>
+  try typeDef <|>
+  try propDef <|>
   constantDef <?>
   "top-level expression"
 
@@ -78,7 +81,7 @@ typeDef :: Parser TopLevel
 typeDef = TypeDef <$>
   (keyword "type" *> name) <*>
   localConstantContext <*>
-  (reservedOp ":=" *> ast)
+  (reservedOp ":=" *> type_)
 
 -- proposition-definition ::=
 --   "prop" identifier local-constant-context ":=" proposition
@@ -92,8 +95,8 @@ propDef = PropDef <$>
 constantDef :: Parser TopLevel
 constantDef = ConstantDef <$>
   name <*>
-  (symbol ":" *> localContext) <*>
-  ast <*>
+  (symbol ":" *> (return $ LocalContext Nothing Nothing Nothing)) <*>
+  type_ <*>
   (symbol ":=" *> ast)
 
 -- local-constant-context ::= [ constant-parameters  ] [ proposition ]
@@ -126,25 +129,59 @@ constantBinding = valueBinding <|> typeBinding <?> "constant binding"
 
 -- binding ::= identifier ":" type
 binding :: Parser Binding
-binding = ((\x y -> (x,y)) <$> (name  <* symbol ":") <*> ast)
+binding = ((\x y -> (x,y)) <$> (name  <* symbol ":") <*> type_)
+
+type_ :: Parser Ast
+type_ = try recType <|>
+        try arrowType <|>
+        identifier <|>
+        builtinType <?>
+        "type expression"
+
+recType :: Parser Ast
+recType = ARecType <$> braces bindings
+  where
+    bindings = sepBy binding $ symbol ","
+
+arrowType :: Parser Ast
+arrowType = AArrowType <$> parens types <* reservedOp "->" <*> type_
+  where
+    types = sepBy type_ $ symbol ","
+
+builtinType :: Parser Ast
+builtinType = ABuiltinType <$> (
+  u8 <|> u16 <|> u32 <|> u64 <|>
+  i8 <|> i16 <|> i32 <|> i64 <|>
+  boolT <|>
+  f32 <|> f64)
+  where
+    u8 = try (keyword "U8" *> return U8)
+    u16 = try (keyword "U16" *> return U16)
+    u32 = try (keyword "U32" *> return U32)
+    u64 = try (keyword "U64" *> return U64)
+    i8 = try (keyword "I8" *> return I8)
+    i16 = try (keyword "I16" *> return I16)
+    i32 = try (keyword "I32" *> return I32)
+    i64 = try (keyword "I64" *> return I64)
+    boolT = try (keyword "Bool" *> return BoolT)
+    f32 = try (keyword "F32" *> return F32)
+    f64 = try (keyword "F64" *> return F64)
 
 ast :: Parser Ast
-ast = block
+ast = try block <|> let_
 
 block :: Parser Ast
 block = ABlock <$> braces (sepBy let_ $ symbol ";")
 
 let_ :: Parser Ast
-let_ = ALet <$>
-  binding <*>
-  (reservedOp ":=" *> if_) <*>
-  let_
+let_ = try letRule <|> if_
+  where
+    letRule = ALet <$> binding <*> (reservedOp ":=" *> if_) <*> let_
 
 if_ :: Parser Ast
-if_ = AIf <$>
-  (keyword "if" *> ast) <*>
-  (keyword "then" *> ast) <*>
-  (keyword "else" *> ast)
+if_ = ifRule <|> binary
+  where
+    ifRule = AIf <$> (keyword "if" *> ast) <*> (keyword "then" *> ast) <*> (keyword "else" *> ast)
 
 opTable :: [[Operator String () Identity Ast]]
 opTable = [
@@ -196,7 +233,7 @@ simple :: Parser Ast
 simple = parens ast <|> identifier <|> literal
 
 literal :: Parser Ast
-literal = bool <|> hex <|> floatingPoint <|> integer
+literal = try bool <|> try hex <|> try floatingPoint <|> try integer <?> "literal"
 
 bool :: Parser Ast
 bool = ALitBoolean <$> (true <|> false) <?> "boolean literal"
@@ -241,6 +278,9 @@ braces = T.braces lexer
 
 symbol :: String -> Parser String
 symbol = string
+
+whiteSpace :: Parser ()
+whiteSpace = T.whiteSpace lexer
 
 -- Create lexer functions for this language.
 -- lexDefs :: GenLanguageDef s u m
