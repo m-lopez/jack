@@ -176,10 +176,10 @@ prop :: Parser Ast
 prop = fail "unsupported-01"
 
 expr :: Parser Ast
-expr = let_ <?> "expression"
+expr = whiteSpace *> ((try block) <|> let_)
 
 block :: Parser Ast
-block = ABlock <$> braces (sepBy let_ $ symbol ";")
+block = ABlock <$> (whiteSpace *> braces (sepBy let_ $ reservedOp ";"))
 
 let_ :: Parser Ast
 let_ = try letRule <|> if_
@@ -196,7 +196,7 @@ opTable = [
   -- Selection operator.
   [ binOpL "." ],
   -- Unary additive operators.
-  [ preOp "-" ],
+  -- [ preOp "-" ],
   -- Multiplicative operations.
   [ binOpL "*",
     binOpL "/",
@@ -212,15 +212,16 @@ opTable = [
     binOpL ">",
     binOpL ">=" ],
   -- Unary logical operators.
-  [ preOp "not" ],
+  -- [ preOp "not" ],
   -- Multiplicative logical operators
   [ binOpL "and",
     binOpL "or"] ]
   where
-    preOp x = 
-      Prefix (reservedOp x *> return (\p -> AApp (AName [ x ]) [ p ]))
-    binOpL x =
-      Infix (reservedOp x *> return (\p1 p2 -> AApp (AName [ x ]) [ p1, p2 ])) AssocLeft
+    preOp x = Prefix
+      (reservedOp x *> return (\p -> AApp (AName [ x ]) [ p ]))
+    binOpL x = Infix
+      (reservedOp x *> return (\p1 p2 -> AApp (AName [ x ]) [ p1, p2 ]))
+      AssocLeft
 
 binary :: Parser Ast
 binary = buildExpressionParser opTable application
@@ -234,11 +235,11 @@ arguments = parens exprs <|> call_expr_as_args
 
 -- application ::= simple arguments | simple
 application :: Parser Ast
-application = try (AApp <$> simple <*> arguments) <|> simple
+application = try (AApp <$> identifier <*> arguments) <|> simple <?> "application"
 
 -- simple ::= '(' expr ')' | variable | literal
 simple :: Parser Ast
-simple = parens expr <|> block <|> identifier <|> literal
+simple = try (parens expr) <|> try identifier <|> try literal <?> "simple expression"
 
 literal :: Parser Ast
 literal = try bool <|> try hex <|> try floatingPoint <|> try integer <?> "literal"
