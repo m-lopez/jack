@@ -100,7 +100,7 @@ propDef = PropDef <$>
 constantDef :: Parser TopLevel
 constantDef = ConstantDef <$>
   name <*>
-  (reservedOp ":" *> (return $ LocalContext Nothing Nothing Nothing)) <*>
+  (reservedOp ":" *> localContext) <*>
   type_ <*>
   (symbol ":=" *> expr)
 
@@ -114,12 +114,16 @@ localConstantContext = LocalConstantContext <$>
 localContext :: Parser LocalContext
 localContext = LocalContext <$>
   (optionMaybe $ try constantParams) <*>
-  (optionMaybe $ try prop) <*>
-  (optionMaybe $ try parameters)
+  (return Nothing) <*> -- (optionMaybe $ try prop) <*>
+  (optionMaybe $ try valueParams)
+
+-- value-parameters ::= parameters "->"
+valueParams :: Parser [Binding]
+valueParams = parameters <* reservedOp "->"
 
 -- constant-parameters ::= "[" { constant-binding, "," }  "]"
 constantParams :: Parser [ConstantParameter]
-constantParams = brackets $ sepBy constantBinding $ symbol ","
+constantParams = brackets $ sepBy constantBinding $ reservedOp ","
 
 -- parameters ::= "(" { binding, "," }  ")"
 parameters :: Parser [Binding]
@@ -134,7 +138,7 @@ constantBinding = valueBinding <|> typeBinding <?> "constant binding"
 
 -- binding ::= identifier ":" type
 binding :: Parser Binding
-binding = ((\x y -> (x,y)) <$> (name  <* symbol ":") <*> type_)
+binding = ((\x y -> (x,y)) <$> (name  <* reservedOp ":") <*> type_)
 
 type_ :: Parser Ast
 type_ = try recType <|>
