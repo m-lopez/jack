@@ -196,7 +196,7 @@ opTable = [
   -- Selection operator.
   [ binOpL "." ],
   -- Unary additive operators.
-  -- [ preOp "-" ],
+  [ preOp "-" ],
   -- Multiplicative operations.
   [ binOpL "*",
     binOpL "/",
@@ -212,7 +212,7 @@ opTable = [
     binOpL ">",
     binOpL ">=" ],
   -- Unary logical operators.
-  -- [ preOp "not" ],
+  [ preOp "not" ],
   -- Multiplicative logical operators
   [ binOpL "and",
     binOpL "or"] ]
