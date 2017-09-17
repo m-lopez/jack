@@ -114,7 +114,7 @@ localConstantContext = LocalConstantContext <$>
 localContext :: Parser LocalContext
 localContext = LocalContext <$>
   (optionMaybe $ try constantParams) <*>
-  (return Nothing) <*> -- (optionMaybe $ try prop) <*>
+  (optionMaybe $ try prop) <*>
   (optionMaybe $ try valueParams)
 
 -- value-parameters ::= parameters "->"
@@ -138,7 +138,7 @@ constantBinding = valueBinding <|> typeBinding <?> "constant binding"
 
 -- binding ::= identifier ":" type
 binding :: Parser Binding
-binding = ((\x y -> (x,y)) <$> (name  <* reservedOp ":") <*> type_)
+binding = (\x y -> (x,y)) <$> (name  <* reservedOp ":") <*> type_
 
 type_ :: Parser Ast
 type_ = try recType <|>
