@@ -176,7 +176,7 @@ prop :: Parser Ast
 prop = fail "unsupported-01"
 
 expr :: Parser Ast
-expr = whiteSpace *> ((try block) <|> let_)
+expr = whiteSpace *> (try block <|> let_)
 
 block :: Parser Ast
 block = ABlock <$> (whiteSpace *> braces (sepBy let_ $ reservedOp ";"))
@@ -256,7 +256,7 @@ qualified :: Parser [AstName]
 qualified = sepBy1 name $ symbol "."
 
 identifier :: Parser Ast
-identifier = AName . (\x -> [x]) <$> name
+identifier = AName . (: []) <$> name
 
 name :: Parser String
 name = T.identifier lexer
@@ -268,7 +268,7 @@ reservedOp :: String -> Parser ()
 reservedOp = T.reservedOp lexer
 
 integer :: Parser Ast
-integer = ALitInteger <$> T.integer lexer
+integer = ALitInteger <$> T.natural lexer
 
 floatingPoint :: Parser Ast
 floatingPoint = ALitDouble <$> T.float lexer
