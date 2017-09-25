@@ -13,7 +13,6 @@ module Syntax.Parser (
   ) where
 
 import Syntax.Ast
-
 import Util.DebugOr( DebugOr(..), fail, mkSuccess )
 import Control.Applicative ((<*), (*>), (<|>), (<$>))
 import Control.Monad (void)
@@ -53,33 +52,37 @@ parseModule code = case parse module_ "Module parser" code of
 
 -- module ;;= [header] { top-level, ";" }
 module_ :: Parser Module
-module_ = Module <$> {-header <*>-}
-  (whiteSpace *> (sepBy toplevel $ reservedOp ";")) -- (sepBy toplevel statementTerminal)
-
-statementTerminal :: Parser ()
-statementTerminal = (many1 $ (symbol ";" *> return ()) <|> (endOfLine *> return ())) *> return ()
+module_ = do
+  maybeHeader <- optionMaybe header
+  tls <- sepBy toplevel $ reservedOp ";"
+  eof
+  return $ Module maybeHeader tls
 
 -- header ::= "module" qualified "(" { identifier, "," }  ")"
-{-header :: Parser (Maybe Header)
-header = optionMaybe $ try header
-  where
-    moduleKw = keyword "module"
-    exportedSymbols = identifier `sepBy` (symbol ",")-}
-    -- header = Header <$> moduleKw *> qualified <*> parens exportedSymbols
+header :: Parser Header
+header = do
+  keyword "module"
+  moduleName <- qualified
+  keyword "export"
+  ops <- parens $ sepBy name $ reservedOp ","
+  return $ Header moduleName ops
 
 -- toplevel ::= import | type-definition | proposition-definition
 --            | constant-definition
 toplevel :: Parser TopLevel
 toplevel =
-  {-import_ <|>-}
+  import_     <|>
   try typeDef <|>
   try propDef <|>
   constantDef <?>
   "top-level expression"
 
 -- import ::= "import" qualified
--- import_ :: Parser TopLevel
--- import_ = Import <$> keyword "import" *> qualified
+import_ :: Parser TopLevel
+import_ = do
+  keyword "import"
+  path <- qualified
+  return $ Import path
 
 -- type-definition ::= "type" identifier local-constant-context ":=" type
 typeDef :: Parser TopLevel

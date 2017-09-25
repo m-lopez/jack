@@ -46,7 +46,7 @@ import Data.List ( find )
 
 -- | Elaboorate a module.
 elabModule :: Ctx -> A.Module -> DebugOr [TlExpr]
-elabModule externCtx (A.Module tls) = do
+elabModule externCtx (A.Module _ tls) = do
   localCtx <- elabDeclarations externCtx tls
   requireUniqueDecls localCtx
   let ctx = externCtx `unionCtx` localCtx
