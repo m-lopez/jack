@@ -50,7 +50,7 @@ parseModule code = case parse module_ "Module parser" code of
   Left x -> fail $ show x
   Right x -> mkSuccess x
 
--- module ;;= [header] { top-level, ";" }
+-- module ::= [header] { top-level, ";" }
 module_ :: Parser Module
 module_ = do
   maybeHeader <- optionMaybe header
@@ -61,6 +61,7 @@ module_ = do
 -- header ::= "module" qualified "(" { identifier, "," }  ")"
 header :: Parser Header
 header = do
+  whiteSpace
   keyword "module"
   moduleName <- qualified
   keyword "export"
