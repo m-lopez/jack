@@ -53,6 +53,7 @@ parseModule code = case parse module_ "Module parser" code of
 -- module ::= [header] { top-level, ";" }
 module_ :: Parser Module
 module_ = do
+  whiteSpace
   maybeHeader <- optionMaybe header
   tls <- sepBy toplevel $ reservedOp ";"
   eof
