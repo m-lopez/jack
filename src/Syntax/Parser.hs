@@ -72,9 +72,9 @@ header = do
 --            | constant-definition
 toplevel :: Parser TopLevel
 toplevel =
-  import_     <|>
-  try typeDef <|>
-  try propDef <|>
+  import_ <|>
+  typeDef <|>
+  propDef <|>
   constantDef <?>
   "top-level expression"
 
@@ -87,18 +87,24 @@ import_ = do
 
 -- type-definition ::= "type" identifier local-constant-context ":=" type
 typeDef :: Parser TopLevel
-typeDef = TypeDef <$>
-  (keyword "type" *> name) <*>
-  localConstantContext <*>
-  (reservedOp ":=" *> type_)
+typeDef = do
+  keyword "type"
+  nm <- name
+  ctx <- localConstantContext
+  reservedOp ":="
+  t <- type_
+  return $ TypeDef nm ctx t
 
 -- proposition-definition ::=
 --   "prop" identifier local-constant-context ":=" proposition
 propDef :: Parser TopLevel
-propDef = PropDef <$>
-  (keyword "prop" *> name) <*>
-  localConstantContext <*>
-  (reservedOp ":=" *> prop)
+propDef = do
+  keyword "prop"
+  nm <- name
+  ctx <- localConstantContext
+  reservedOp ":="
+  p <- prop
+  return $ PropDef nm ctx p
 
 -- constant-definition ::= identifier ":" local-context type ":=" expression
 constantDef :: Parser TopLevel
@@ -152,7 +158,7 @@ type_ = try recType <|>
         "type expression"
 
 recType :: Parser Ast
-recType = ARecType <$> braces bindings
+recType = ARecType <$> brackets bindings
   where
     bindings = sepBy binding $ symbol ","
 
