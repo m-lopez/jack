@@ -10,6 +10,7 @@ Portability : non-portable
 module Syntax.Ast (
   Ast(..),
   AstName,
+  QualifiedAstName,
   Module(..),
   Header(..),
   TopLevel(..),
@@ -17,12 +18,14 @@ module Syntax.Ast (
   ConstantParameter(..),
   LocalConstantContext(..),
   BuiltinType(..),
-  Binding ) where
+  Binding(..),
+  ObjectModifier(..) ) where
 
 
 
 -- | A type for symbols in Asts.
-type AstName  = String
+type AstName = String
+type QualifiedAstName = [String]
 
 -- | The AST for a Toaster module.
 data Module = Module (Maybe Header) [TopLevel]
@@ -32,12 +35,12 @@ instance Show Module where
   show (Module (Just hdr) tls) = "Module (" ++ show hdr ++ ") " ++ show tls
 
 -- | List of symbols to export.
-data Header = Header [AstName] [AstName]
+data Header = Header QualifiedAstName [AstName]
   deriving ( Show, Eq )
 
 -- | Top-level definitions.
 data TopLevel =
-  Import [AstName] |
+  Import QualifiedAstName |
   TypeDef AstName LocalConstantContext Ast |
   PropDef AstName LocalConstantContext Ast |
   ConstantDef AstName LocalContext Ast Ast
@@ -67,28 +70,34 @@ data LocalConstantContext = LocalConstantContext
 data Ast =
   ABuiltinType BuiltinType |
   ARecType [Binding] |
-  AArrowType [Ast] Ast |
+  AArrowType [(ObjectModifier, Ast)] Ast |
   ALitBoolean Bool |
   ALitInteger Integer |
   ALitDouble Double |
-  AName [AstName] |
+  AName AstName |
   AAbs [Binding] Ast |
   AApp Ast [Ast] |
   AIf Ast Ast Ast |
   ADot AstName Ast |
   ARecInit [(Binding,Ast)] |
   ALet Binding Ast Ast |
-  ABlock [Ast]
+  ABlock [Ast] |
+  AWhile Ast Ast
   deriving (Show, Eq)
 
 -- | Builtin data types.
 data BuiltinType =
   U8 | U16 | U32 | U64 |  -- unsigned integer types
   I8 | I16 | I32 | I64 |  -- signed integer types
-  BoolT |                  -- Boolean
+  BoolT |                 -- Boolean
+  VoidT |                 -- Void
   F32 | F64               -- IEEE 754 floating-point
   deriving ( Show, Eq )
 
 -- | A name-type binding.
-type Binding = (AstName, Ast)
+data Binding = Binding AstName ObjectModifier Ast
+  deriving ( Show, Eq )
+
+-- | Object type modifier. Modifies how a stack object is treated.
+data ObjectModifier = Constant | Mutable deriving ( Show, Eq )
 

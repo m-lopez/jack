@@ -31,6 +31,7 @@ import Text.Parsec.Token (
   GenTokenParser )
 import qualified Text.Parsec.Token as T
 import Data.Int ( Int32(..) )
+import Data.Maybe ( isJust )
 {- Notes
   One of the reasons that this parser is so complicated is that lexing logic is
   mingled with parsing logic. Not sure how to preserve the good parsec debug
@@ -66,7 +67,8 @@ header = do
   keyword "module"
   moduleName <- qualified
   keyword "export"
-  ops <- parens $ sepBy name $ reservedOp ","
+  ops <- sepBy identifier $ reservedOp ","
+  keyword "where"
   return $ Header moduleName ops
 
 -- toplevel ::= import | type-definition | proposition-definition
@@ -90,7 +92,7 @@ import_ = do
 typeDef :: Parser TopLevel
 typeDef = do
   keyword "type"
-  nm <- name
+  nm <- identifier
   ctx <- localConstantContext
   reservedOp ":="
   t <- type_
@@ -101,7 +103,7 @@ typeDef = do
 propDef :: Parser TopLevel
 propDef = do
   keyword "prop"
-  nm <- name
+  nm <- identifier
   ctx <- localConstantContext
   reservedOp ":="
   p <- prop
@@ -110,7 +112,7 @@ propDef = do
 -- constant-definition ::= identifier ":" local-context type ":=" expression
 constantDef :: Parser TopLevel
 constantDef = ConstantDef <$>
-  name <*>
+  identifier <*>
   (reservedOp ":" *> localContext) <*>
   type_ <*>
   (symbol ":=" *> expr)
@@ -144,35 +146,49 @@ parameters = parens $ sepBy binding $ symbol ","
 constantBinding :: Parser ConstantParameter
 constantBinding = valueBinding <|> typeBinding <?> "constant binding"
   where
-    typeBinding = try $ TypeParameter <$> name
+    typeBinding = try $ TypeParameter <$> identifier
     valueBinding = try $ ValueParameter <$> binding
 
 -- binding ::= identifier ":" type
 binding :: Parser Binding
-binding = (\x y -> (x,y)) <$> (name  <* reservedOp ":") <*> type_
+binding = do
+  nm <- identifier
+  reservedOp ":"
+  (objMod, t) <- objectType
+  return $ Binding nm objMod t
 
 type_ :: Parser Ast
 type_ = try recType <|>
         try arrowType <|>
-        identifier <|>
+        name <|>
         builtinType <?>
         "type expression"
 
 recType :: Parser Ast
-recType = ARecType <$> brackets bindings
+recType = ARecType <$> braces bindings
   where
     bindings = sepBy binding $ symbol ","
 
+objectType :: Parser (ObjectModifier, Ast)
+objectType = do
+  hasMut <- optionMaybe $ keyword "mut"
+  let objMod = if isJust hasMut then Mutable else Constant
+  t <- type_
+  return (objMod, t)
+
 arrowType :: Parser Ast
-arrowType = AArrowType <$> parens types <* reservedOp "->" <*> type_
-  where
-    types = sepBy type_ $ symbol ","
+arrowType = do
+  ts <- parens $ sepBy objectType $ symbol ","
+  reservedOp "->"
+  t <- type_
+  return $ AArrowType ts t
 
 builtinType :: Parser Ast
 builtinType = ABuiltinType <$> (
   u8 <|> u16 <|> u32 <|> u64 <|>
   i8 <|> i16 <|> i32 <|> i64 <|>
   boolT <|>
+  voidT <|>
   f32 <|> f64)
   where
     u8 = try (keyword "U8" *> return U8)
@@ -184,6 +200,7 @@ builtinType = ABuiltinType <$> (
     i32 = try (keyword "I32" *> return I32)
     i64 = try (keyword "I64" *> return I64)
     boolT = try (keyword "Bool" *> return BoolT)
+    voidT = try (keyword "Void" *> return VoidT)
     f32 = try (keyword "F32" *> return F32)
     f64 = try (keyword "F64" *> return F64)
 
@@ -194,7 +211,17 @@ expr :: Parser Ast
 expr = whiteSpace *> (try block <|> let_)
 
 block :: Parser Ast
-block = ABlock <$> (whiteSpace *> braces (sepBy let_ $ reservedOp ";"))
+block = ABlock <$> (whiteSpace *> braces (sepBy while $ reservedOp ";"))
+
+while :: Parser Ast
+while = try whileRule <|> let_
+  where 
+    whileRule = do
+      keyword "while"
+      condition <- expr
+      keyword "do"
+      body <- expr
+      return $ AWhile condition body
 
 let_ :: Parser Ast
 let_ = try letRule <|> if_
@@ -202,9 +229,30 @@ let_ = try letRule <|> if_
     letRule = ALet <$> binding <*> (reservedOp ":=" *> if_) <*> let_
 
 if_ :: Parser Ast
-if_ = ifRule <|> binary
+if_ = ifRule <|> record
   where
-    ifRule = AIf <$> (keyword "if" *> expr) <*> (keyword "then" *> expr) <*> (keyword "else" *> expr)
+    ifRule = do
+      keyword "if"
+      cond <- expr
+      keyword "then"
+      e1 <- expr
+      keyword "else"
+      e2 <- expr
+      return $ AIf cond e1 e2
+
+record :: Parser Ast
+record = try recordRule <|> binary
+  where
+    recordRule = ARecInit <$> braces bs
+    bs = sepBy localInit $ reservedOp ","
+
+-- | A local initialization.
+localInit :: Parser (Binding, Ast)
+localInit = do
+  b <- binding
+  reservedOp ":="
+  e <- expr
+  return (b, e)
 
 opTable :: [[Operator String () Identity Ast]]
 opTable = [
@@ -233,9 +281,9 @@ opTable = [
     binOpL "or"] ]
   where
     preOp x = Prefix
-      (reservedOp x *> return (\p -> AApp (AName [ x ]) [ p ]))
+      (reservedOp x *> return (\p -> AApp (AName x) [ p ]))
     binOpL x = Infix
-      (reservedOp x *> return (\p1 p2 -> AApp (AName [ x ]) [ p1, p2 ]))
+      (reservedOp x *> return (\p1 p2 -> AApp (AName x) [ p1, p2 ]))
       AssocLeft
 
 binary :: Parser Ast
@@ -250,11 +298,11 @@ arguments = parens exprs <|> call_expr_as_args
 
 -- application ::= simple arguments | simple
 application :: Parser Ast
-application = try (AApp <$> identifier <*> arguments) <|> simple <?> "application"
+application = try (AApp <$> name <*> arguments) <|> simple <?> "application"
 
 -- simple ::= '(' expr ')' | variable | literal
 simple :: Parser Ast
-simple = try (parens expr) <|> try identifier <|> try literal <?> "simple expression"
+simple = try (parens expr) <|> try name <|> try literal <?> "simple expression"
 
 literal :: Parser Ast
 literal = try bool <|> try hex <|> try floatingPoint <|> try integer <?> "literal"
@@ -265,16 +313,17 @@ bool = ALitBoolean <$> (true <|> false) <?> "boolean literal"
     true = try $ keyword "true" *> return True
     false = try $ keyword "false" *> return False
 
+-- | Just a wrapper function for identifiers.
+name :: Parser Ast
+name = AName <$> identifier
+
 -- | A qualified symbol is one that is prepended by dot selections.
 -- qualified ::= { identifier , "." }1
 qualified :: Parser [AstName]
-qualified = sepBy1 name $ symbol "."
+qualified = sepBy1 identifier $ symbol "."
 
-identifier :: Parser Ast
-identifier = AName . (: []) <$> name
-
-name :: Parser String
-name = T.identifier lexer
+identifier :: Parser String
+identifier = T.identifier lexer
 
 keyword :: String -> Parser ()
 keyword = T.reserved lexer

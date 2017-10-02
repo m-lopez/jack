@@ -236,7 +236,7 @@ checkBuiltinType bt = case bt of
   F32 -> fail "unsupported"
   F64 -> fail "unsupported"
 
-checkRecType :: Ctx -> [(String, Ast)] -> DebugOr CType
+checkRecType :: Ctx -> [A.Binding] -> DebugOr CType
 checkRecType _ = fail "nothing"
 
 checkUnquantTypes :: Ctx -> [Ast] -> DebugOr [CType]
